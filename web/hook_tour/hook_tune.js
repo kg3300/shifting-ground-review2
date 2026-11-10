@@ -33,13 +33,16 @@ function hatchImage(c, dpr) {   // one tile of the pattern, drawn at device reso
   return g.getImageData(0, 0, n, n);
 }
 const PATTERNS = { dash: [4, 3], dot: [0.1, 2.2] };          // in line widths (MapLibre's unit for dashes)
-// Mask outside Punjab (Krishna, 10 Nov): one fill over the whole world with Punjab's outline cut out of it, drawn above
-// everything (satellite, paddy grain, lines, hatches), so what lies inside Punjab stands out. Layer settings are untouched.
-// Black at opacity a = everything outside at (1 - a) against the dark background. The Punjab outline is kept above the mask.
+// Masks (Krishna, 10 Nov): one fill over the whole world with an outline cut out of it, drawn above everything
+// (satellite, paddy grain, lines, hatches), so what lies inside stands out. Layer settings are untouched.
+// Black at opacity a = everything outside at (1 - a) against the dark background. The outline itself is kept above the mask.
+// [id, label, source of the outline, outline layers lifted above the masks]
+const MASKS = [["punjab", "Punjab's outline", "punjab", ["punjab_line"]],
+               ["area", "the Sangrur–Barnala outline", "area", ["area_line", "district_line"]]];
 const MASK_DEF = { on: false, op: 0.6, col: "#000000" };
 const signedArea = r => r.reduce((s, p, i) => { const q = r[(i + 1) % r.length]; return s + (p[0] * q[1] - q[0] * p[1]); }, 0) / 2;
 
-export function initTune({ map, steps, getStep, defaultOn, defaultHatch, places, defaultPlaces, scale }) {
+export function initTune({ map, steps, getStep, defaultOn, defaultHatch, defaultMask, places, defaultPlaces, scale }) {
   const KEY = "hookTune";
   const EMPTY = () => ({ lines: {}, places: {}, hatches: {}, mask: {} });
   let saved = EMPTY();
@@ -91,28 +94,33 @@ export function initTune({ map, steps, getStep, defaultOn, defaultHatch, places,
       map.setPaintProperty(id, "fill-opacity", c.op);
     }
   }
-  const maskCfg = st => ({ ...MASK_DEF, ...((saved.mask.punjab || {})[st] || {}) });
+  const maskCfg = (id, st) => ({ ...MASK_DEF, on: !!(defaultMask && defaultMask(id, st)), ...((saved.mask[id] || {})[st] || {}) });
   let maskReady = null;
-  function ensureMask() {           // built once, from the page's own Punjab outline (kit/data/punjab.geojson)
+  function ensureMasks() {          // built once, from the page's own outlines (kit/data/punjab.geojson, area_outline.geojson)
     return maskReady ||= (async () => {
-      const fc = await map.getSource("punjab").getData();
       const world = [[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]];          // counter-clockwise
-      const holes = [];
-      for (const f of fc.features || [fc]) {
-        const g = f.geometry, polys = g.type === "Polygon" ? [g.coordinates] : g.type === "MultiPolygon" ? g.coordinates : [];
-        for (const p of polys) { const r = p[0].slice(); if (signedArea(r) > 0) r.reverse(); holes.push(r); }   // holes run clockwise
+      for (const [id, , src, lift] of MASKS) {
+        const fc = await map.getSource(src).getData(), holes = [];
+        for (const f of fc.features || [fc]) {
+          const g = f.geometry, polys = g.type === "Polygon" ? [g.coordinates] : g.type === "MultiPolygon" ? g.coordinates : [];
+          for (const p of polys) { const r = p[0].slice(); if (signedArea(r) > 0) r.reverse(); holes.push(r); }   // holes run clockwise
+        }
+        map.addSource(id + "_mask", { type: "geojson", data: { type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [world, ...holes] } } });
+        map.addLayer({ id: id + "_mask", type: "fill", source: id + "_mask", layout: { visibility: "none" }, paint: { "fill-color": "#000", "fill-opacity": 0 } });
+        // stacked in pairs: punjab_mask, punjab_line, area_mask, area_line, district_line. Each outline sits above its own
+        // mask only, so the study-area mask still dims the Punjab outline on slides 4-6.
+        for (const l of lift) if (map.getLayer(l)) map.moveLayer(l);
       }
-      map.addSource("punjab_mask", { type: "geojson", data: { type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [world, ...holes] } } });
-      map.addLayer({ id: "punjab_mask", type: "fill", source: "punjab_mask", layout: { visibility: "none" }, paint: { "fill-color": "#000", "fill-opacity": 0 } });
-      if (map.getLayer("punjab_line")) map.moveLayer("punjab_line");                         // outline above the mask
     })();
   }
   function applyMask(st) {
-    ensureMask().then(() => {
-      const c = maskCfg(st);
-      map.setLayoutProperty("punjab_mask", "visibility", c.on ? "visible" : "none");
-      map.setPaintProperty("punjab_mask", "fill-color", c.col);
-      map.setPaintProperty("punjab_mask", "fill-opacity", c.op);
+    ensureMasks().then(() => {
+      for (const [id] of MASKS) {
+        const c = maskCfg(id, st);
+        map.setLayoutProperty(id + "_mask", "visibility", c.on ? "visible" : "none");
+        map.setPaintProperty(id + "_mask", "fill-color", c.col);
+        map.setPaintProperty(id + "_mask", "fill-opacity", c.op);
+      }
     }).catch(e => console.warn("mask:", e));
   }
   function apply(st = getStep()) { applyLines(st); applyHatches(st); applyPlaces(st); applyMask(st); }
@@ -174,12 +182,15 @@ export function initTune({ map, steps, getStep, defaultOn, defaultHatch, places,
           <span>Colour</span><input type="color" data-k="col" value="${c.col}">
         </div></div>`;
     }
-    const mk = maskCfg(st);
-    h += `<h3>Mask outside Punjab</h3><div class="row" data-mask="punjab"><label class="nm"><input type="checkbox" data-k="on" ${mk.on ? "checked" : ""}>Dim everything outside Punjab's outline</label>
-      <div class="ctl ${mk.on ? "" : "off"}">
-        <span>Opacity ${mk.op}</span><span>Colour</span>
-        <input type="range" data-k="op" min="0" max="1" step="0.05" value="${mk.op}"><input type="color" data-k="col" value="${mk.col}">
-      </div></div>`;
+    h += `<h3>Masks</h3>`;
+    for (const [id, label] of MASKS) {
+      const mk = maskCfg(id, st);
+      h += `<div class="row" data-mask="${id}"><label class="nm"><input type="checkbox" data-k="on" ${mk.on ? "checked" : ""}>Dim everything outside ${label}</label>
+        <div class="ctl ${mk.on ? "" : "off"}">
+          <span>Opacity ${mk.op}</span><span>Colour</span>
+          <input type="range" data-k="op" min="0" max="1" step="0.05" value="${mk.op}"><input type="color" data-k="col" value="${mk.col}">
+        </div></div>`;
+    }
     h += `<h3>Places</h3>`;
     for (const [kind, label] of [["capital", "Capitals and big cities"], ["hq", "Punjab district headquarters"], ["belt", "Belt towns"]]) {
       h += `<div class="kind">${label} <button data-all="${kind}">all</button><button data-none="${kind}">none</button></div><div class="places">`;

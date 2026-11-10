@@ -393,6 +393,7 @@ map.on("load", async () => {
   TUNE = initTune({ map, steps: STEPS, getStep: () => step, scale: () => s, places: DATA.places,
     defaultOn: (id, st) => { const want = new Set(MAPLAYERS.base); STEPS[st].on.forEach(k => MAPLAYERS[k].forEach(x => want.add(x))); return want.has(id); },
     defaultHatch: (id, st) => id === "belt_hatch" ? STEPS[st].on.includes("belt") : STEPS[st].frame === "f3_punjab",
+    defaultMask: (id, st) => (id === "punjab" && st === 2) || (id === "area" && [3, 4, 5].includes(st)),   // Krishna, 10 Nov: outside Punjab dimmed on slide 3, outside Sangrur-Barnala on slides 4-6
     defaultPlaces: (name, st) => (STEPS[st].on.includes("belt") && cityNames.has(name)) || (STEPS[st].labels === "towns" && townNames.has(name)) });
   // baked defaults: hook_tune.json (Krishna's settings, once sent); ?tunefile=x.json loads another file and always wins (for stills)
   try { const tf = Q.get("tunefile") || "hook_tune.json", base = await fetch(tf);
