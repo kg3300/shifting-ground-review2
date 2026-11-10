@@ -33,10 +33,16 @@ function hatchImage(c, dpr) {   // one tile of the pattern, drawn at device reso
   return g.getImageData(0, 0, n, n);
 }
 const PATTERNS = { dash: [4, 3], dot: [0.1, 2.2] };          // in line widths (MapLibre's unit for dashes)
+// Mask outside Punjab (Krishna, 10 Nov): one fill over the whole world with Punjab's outline cut out of it, drawn above
+// everything (satellite, paddy grain, lines, hatches), so what lies inside Punjab stands out. Layer settings are untouched.
+// Black at opacity a = everything outside at (1 - a) against the dark background. The Punjab outline is kept above the mask.
+const MASK_DEF = { on: false, op: 0.6, col: "#000000" };
+const signedArea = r => r.reduce((s, p, i) => { const q = r[(i + 1) % r.length]; return s + (p[0] * q[1] - q[0] * p[1]); }, 0) / 2;
 
 export function initTune({ map, steps, getStep, defaultOn, defaultHatch, places, defaultPlaces, scale }) {
   const KEY = "hookTune";
-  let saved = { lines: {}, places: {}, hatches: {} };
+  const EMPTY = () => ({ lines: {}, places: {}, hatches: {}, mask: {} });
+  let saved = EMPTY();
   try { saved = Object.assign(saved, JSON.parse(localStorage.getItem(KEY) || "{}")); } catch (e) {}
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {} };
   const ids = TUNE_LINES.flatMap(g => g[1].map(x => x[0]));
@@ -85,7 +91,31 @@ export function initTune({ map, steps, getStep, defaultOn, defaultHatch, places,
       map.setPaintProperty(id, "fill-opacity", c.op);
     }
   }
-  function apply(st = getStep()) { applyLines(st); applyHatches(st); applyPlaces(st); }
+  const maskCfg = st => ({ ...MASK_DEF, ...((saved.mask.punjab || {})[st] || {}) });
+  let maskReady = null;
+  function ensureMask() {           // built once, from the page's own Punjab outline (kit/data/punjab.geojson)
+    return maskReady ||= (async () => {
+      const fc = await map.getSource("punjab").getData();
+      const world = [[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]];          // counter-clockwise
+      const holes = [];
+      for (const f of fc.features || [fc]) {
+        const g = f.geometry, polys = g.type === "Polygon" ? [g.coordinates] : g.type === "MultiPolygon" ? g.coordinates : [];
+        for (const p of polys) { const r = p[0].slice(); if (signedArea(r) > 0) r.reverse(); holes.push(r); }   // holes run clockwise
+      }
+      map.addSource("punjab_mask", { type: "geojson", data: { type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [world, ...holes] } } });
+      map.addLayer({ id: "punjab_mask", type: "fill", source: "punjab_mask", layout: { visibility: "none" }, paint: { "fill-color": "#000", "fill-opacity": 0 } });
+      if (map.getLayer("punjab_line")) map.moveLayer("punjab_line");                         // outline above the mask
+    })();
+  }
+  function applyMask(st) {
+    ensureMask().then(() => {
+      const c = maskCfg(st);
+      map.setLayoutProperty("punjab_mask", "visibility", c.on ? "visible" : "none");
+      map.setPaintProperty("punjab_mask", "fill-color", c.col);
+      map.setPaintProperty("punjab_mask", "fill-opacity", c.op);
+    }).catch(e => console.warn("mask:", e));
+  }
+  function apply(st = getStep()) { applyLines(st); applyHatches(st); applyPlaces(st); applyMask(st); }
 
   // ---------- the panel ----------
   const panel = document.createElement("div");
@@ -144,6 +174,12 @@ export function initTune({ map, steps, getStep, defaultOn, defaultHatch, places,
           <span>Colour</span><input type="color" data-k="col" value="${c.col}">
         </div></div>`;
     }
+    const mk = maskCfg(st);
+    h += `<h3>Mask outside Punjab</h3><div class="row" data-mask="punjab"><label class="nm"><input type="checkbox" data-k="on" ${mk.on ? "checked" : ""}>Dim everything outside Punjab's outline</label>
+      <div class="ctl ${mk.on ? "" : "off"}">
+        <span>Opacity ${mk.op}</span><span>Colour</span>
+        <input type="range" data-k="op" min="0" max="1" step="0.05" value="${mk.op}"><input type="color" data-k="col" value="${mk.col}">
+      </div></div>`;
     h += `<h3>Places</h3>`;
     for (const [kind, label] of [["capital", "Capitals and big cities"], ["hq", "Punjab district headquarters"], ["belt", "Belt towns"]]) {
       h += `<div class="kind">${label} <button data-all="${kind}">all</button><button data-none="${kind}">none</button></div><div class="places">`;
@@ -157,6 +193,13 @@ export function initTune({ map, steps, getStep, defaultOn, defaultHatch, places,
   }
   panel.addEventListener("input", e => {
     const row = e.target.closest(".row"), st = getStep();
+    if (row && row.dataset.mask) {                      // the mask
+      const k = e.target.dataset.k, v = k === "on" ? e.target.checked : k === "op" ? +e.target.value : e.target.value;
+      set("mask", row.dataset.mask, st, { [k]: v });
+      applyMask(st);
+      if (k === "op") row.querySelectorAll(".ctl span")[0].textContent = `Opacity ${v}`;
+      return;
+    }
     if (row && row.dataset.hatch) {                     // a hatch control
       const k = e.target.dataset.k, v = e.target.type === "checkbox" ? e.target.checked : ["sp", "w", "op"].includes(k) ? +e.target.value : e.target.value;
       set("hatches", row.dataset.hatch, st, { [k]: v });
@@ -184,9 +227,9 @@ export function initTune({ map, steps, getStep, defaultOn, defaultHatch, places,
     if (kAll || kNone) { for (const p of markers.filter(p => p.kind === (kAll || kNone))) { saved.places[p.name] = saved.places[p.name] || {}; saved.places[p.name][st] = !!kAll; }
       save(); applyPlaces(st); build(); }
     if (e.target.id === "tuneCopy") navigator.clipboard.writeText(JSON.stringify(saved)).then(() => { e.target.textContent = "Copied"; }, () => { e.target.textContent = "Copy failed: see console"; console.log(JSON.stringify(saved)); });
-    if (e.target.id === "tuneResetSlide") { for (const b of ["lines", "places", "hatches"]) for (const k in saved[b]) delete saved[b][k][st]; save(); apply(st); build(); }
-    if (e.target.id === "tuneResetAll" && confirm("Reset every slide to the page's own design?")) { saved = { lines: {}, places: {}, hatches: {} }; save(); apply(st); build(); }
+    if (e.target.id === "tuneResetSlide") { for (const b of ["lines", "places", "hatches", "mask"]) for (const k in saved[b]) delete saved[b][k][st]; save(); apply(st); build(); }
+    if (e.target.id === "tuneResetAll" && confirm("Reset every slide to the page's own design?")) { saved = EMPTY(); save(); apply(st); build(); }
   });
   const toggle = () => { panel.classList.toggle("on"); if (panel.classList.contains("on")) build(); };
-  return { apply, toggle, refresh: () => { if (panel.classList.contains("on")) build(); }, load: s => { saved = Object.assign({ lines: {}, places: {}, hatches: {} }, s); save(); apply(); } };
+  return { apply, toggle, refresh: () => { if (panel.classList.contains("on")) build(); }, load: s => { saved = Object.assign(EMPTY(), s); save(); apply(); } };
 }
