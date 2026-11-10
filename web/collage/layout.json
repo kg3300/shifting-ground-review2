@@ -1,0 +1,37 @@
+{
+  "source": "Figma KJYIdATJ25L9HI84gAYZGR, frame 29:81 (Krishna's working board), read 9 Nov 2026. x, y, w, h in board pixels relative to the frame; list order = stacking order (first = bottom).",
+  "frame": {"w": 9420, "h": 1472},
+  "band": {"x": 0, "y": 214, "w": 9289, "h": 737},
+  "years": [
+    {"t": "1960", "x": 551, "w": 225}, {"t": "1970", "x": 1878, "w": 216}, {"t": "1980", "x": 3206, "w": 224},
+    {"t": "1990", "x": 4532, "w": 225}, {"t": "2000", "x": 5859, "w": 239}, {"t": "2010", "x": 7200, "w": 223},
+    {"t": "2020", "x": 8527, "w": 237}
+  ],
+  "images": [
+    {"id": "29:96",  "f": "196x_price_market",            "x": 933,  "y": 560, "w": 380, "h": 323},
+    {"id": "29:97",  "f": "196x_seed_pesticide_dusting",  "x": 715,  "y": 268, "w": 480, "h": 315},
+    {"id": "29:98",  "f": "197x_seed_transplanting",      "x": 1797, "y": 428, "w": 696, "h": 436},
+    {"id": "29:99",  "f": "196x_seed_borlaug",            "x": 18,   "y": 268, "w": 318, "h": 385},
+    {"id": "29:101", "f": "1965_seed_shastri_wheat",      "x": 397,  "y": 438, "w": 416, "h": 340},
+    {"id": "29:102", "f": "196x_seed_IR8",                "x": 1284, "y": 251, "w": 450, "h": 405},
+    {"id": "29:103", "f": "197x_price_threshing_yard",    "x": 2280, "y": 258, "w": 478, "h": 319},
+    {"id": "29:104", "f": "197x_seed_transplanting_woman","x": 1529, "y": 606, "w": 313, "h": 322},
+    {"id": "29:106", "f": "196x_seed_swaminathan",        "x": 198,  "y": 587, "w": 233, "h": 331},
+    {"id": "29:107", "f": "1984_context_bluestar_army",   "x": 2923, "y": 279, "w": 507, "h": 367},
+    {"id": "29:108", "f": "198x_price_tractor_flag",      "x": 2710, "y": 487, "w": 267, "h": 430},
+    {"id": "29:110", "f": "2020_price_protest_flag",      "x": 7756, "y": 571, "w": 540, "h": 355},
+    {"id": "29:111", "f": "2020_price_protest_tractors",  "x": 8169, "y": 271, "w": 581, "h": 426},
+    {"id": "29:112", "f": "2020_price_protest_women",     "x": 8685, "y": 519, "w": 486, "h": 312},
+    {"id": "29:113", "f": "198x_power_pylons",            "x": 3781, "y": 313, "w": 555, "h": 368},
+    {"id": "29:115", "f": "199x_power_diesel_pump",       "x": 4629, "y": 286, "w": 573, "h": 362},
+    {"id": "29:116", "f": "199x_power_tubewell",          "x": 4173, "y": 535, "w": 563, "h": 375},
+    {"id": "29:120", "f": "201x_fire_stubble_farmer",     "x": 6754, "y": 239, "w": 512, "h": 388},
+    {"id": "29:121", "f": "201x_fire_smoke_sprayer",      "x": 7052, "y": 507, "w": 493, "h": 400},
+    {"id": "29:122", "f": "201x_fire_burning",            "x": 7354, "y": 261, "w": 606, "h": 373},
+    {"id": "34:190", "f": "200x_water_drilling_rig",      "x": 5428, "y": 262, "w": 776, "h": 410},
+    {"id": "29:118", "f": "199x_water_field_channel",     "x": 5029, "y": 521, "w": 541, "h": 361},
+    {"id": "29:105", "f": "198x_price_rice_sacks",        "x": 3316, "y": 527, "w": 517, "h": 362},
+    {"id": "36:193", "f": "200x_politics_unnamed",        "x": 6047, "y": 460, "w": 536, "h": 374},
+    {"id": "29:117", "f": "201x_water_cracked_earth",     "x": 6530, "y": 597, "w": 452, "h": 305}
+  ]
+}

@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shifting Ground Hook</title>
+<!-- The hook, act 1 of the Review 2 presentation: a guided tour (7 steps) with hover on everything.
+     STRUCTURE ONLY. Every colour, line weight, marker and panel style here is a PLACEHOLDER copied from the ranking used by
+     Drought Interfaces (notes/drought_interfaces_study.md). Krishna's Figma styles replace them: see STYLE below.
+     Text: fact lines and sources only; Krishna writes the sentences ("[Your text]").
+     Base: Drought Interfaces' treatment (Krishna's choice, 8 Nov, "A"). ?base=neg shows the rejected inverted version.
+     Grain: drawn live and exact at any zoom (live_grain.js) from web/tiles/paddy_share (render_share_tiles.py).
+     ?offline    -> satellite tiles from web/tiles/eox (cache_tiles.py);  ?step=5 -> open at step 5.
+     Keys: <- -> step, H home (back to the step's view), B switch base. -->
+<link rel="stylesheet" href="../vendor/maplibre-gl-5.24.0/maplibre-gl.css">
+<script src="../vendor/maplibre-gl-5.24.0/maplibre-gl.js"></script>
+<style>
+  :root { --ground: hsl(222, 56%, 4%); --ink: #fff; --ink2: rgba(255,255,255,.75); --ink3: rgba(255,255,255,.5);
+          --panel: rgba(8, 10, 16, .82); --rule: rgba(255,255,255,.2); --font: Arial, Helvetica, sans-serif; }
+  html, body { margin: 0; height: 100%; background: var(--ground); color: var(--ink); font-family: var(--font); overflow: hidden; }
+  #map { position: absolute; inset: 0; }
+  #ticks { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; overflow: visible; }
+  /* left text panel: 576 of 1920 px (Krishna, 8 Nov), scaled with the frame */
+  #panel { position: absolute; top: 0; bottom: 0; background: var(--panel); display: flex; flex-direction: column; gap: 14px;
+           padding: 28px 28px 22px; box-sizing: border-box; z-index: 2; }
+  #count { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink3); }
+  #title { margin: 0; font-size: 22px; font-weight: 700; font-style: italic; line-height: 1.15; }
+  #yours { color: var(--ink3); font-style: italic; font-size: 14px; border: 1px dashed var(--rule); padding: 10px 12px; }
+  #fact { font-size: 16px; line-height: 1.4; }
+  #src { font-size: 11px; line-height: 1.45; color: var(--ink3); }
+  .verify { color: #ffcf6b; }
+  #key { margin-top: 4px; display: grid; gap: 8px; font-size: 11px; color: var(--ink2); }
+  #key b { display: block; text-transform: uppercase; letter-spacing: .08em; font-size: 10px; color: var(--ink); font-weight: 600; }
+  #nav { margin-top: auto; display: flex; align-items: center; gap: 10px; }
+  #nav button { background: none; color: var(--ink); border: 1px solid var(--rule); width: 40px; height: 32px; font-size: 16px; cursor: pointer; }
+  #nav button:disabled { opacity: .3; cursor: default; }
+  #dots { display: flex; gap: 8px; flex: 1; justify-content: center; }
+  #dots i { width: 9px; height: 9px; border-radius: 50%; background: var(--ink3); cursor: pointer; }
+  #dots i.on { background: var(--ink); outline: 2px solid var(--ink3); outline-offset: 2px; }
+  #credits { position: absolute; right: 8px; bottom: 6px; font-size: 10px; color: var(--ink3); z-index: 2; text-align: right; max-width: 60%; }
+  #credits a { color: inherit; }
+  #tools { position: absolute; right: 10px; top: 10px; z-index: 2; display: flex; flex-direction: column; gap: 6px; }
+  #tools button { width: 30px; height: 30px; background: var(--panel); color: var(--ink); border: 1px solid var(--rule); cursor: pointer; font-size: 15px; }
+  #placeholder { position: absolute; right: 50px; top: 12px; z-index: 2; font-size: 10px; letter-spacing: .1em; text-transform: uppercase;
+                 color: #ffcf6b; border: 1px solid #ffcf6b; padding: 4px 8px; }
+  /* hover box: name bold, values, italic type line, then the source (Drought Interfaces has no source line; we do) */
+  .hov .maplibregl-popup-content { background: rgba(8,10,16,.88); color: var(--ink); padding: 7px 9px; border-radius: 3px; font: 11px/1.45 var(--font); box-shadow: none; max-width: 260px; }
+  .hov .maplibregl-popup-tip { display: none; }
+  .hov p { margin: 0; color: var(--ink2); } .hov p:first-child { color: var(--ink); font-weight: 700; }
+  .hov .type { font-style: italic; } .hov .src { color: var(--ink3); font-size: 10px; margin-top: 3px; } .hov .warn { color: #ffcf6b; }
+  .lbl { font: 12px var(--font); color: var(--ink); text-shadow: 0 0 3px #000, 0 0 2px #000; pointer-events: none; white-space: nowrap; }
+  .lbl::before { content: ""; display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: var(--ink); margin-right: 5px; vertical-align: 1px; }
+  .lbl.pct { font-weight: 700; } .lbl.pct::before { display: none; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<svg id="ticks" xmlns="http://www.w3.org/2000/svg"></svg>
+<aside id="panel">
+  <div id="count"></div>
+  <h1 id="title"></h1>
+  <div id="yours">[Your text]</div>
+  <div id="fact"></div>
+  <div id="src"></div>
+  <div id="key"></div>
+  <div id="nav"><button id="prev" aria-label="Previous step">&larr;</button><div id="dots"></div><button id="next" aria-label="Next step">&rarr;</button></div>
+</aside>
+<div id="tools"><button id="home" title="Back to this step's view (H)">&#8962;</button><button id="zin" title="Zoom in">+</button><button id="zout" title="Zoom out">&minus;</button></div>
+<div id="placeholder">Placeholder styling</div>
+<div id="credits">Satellite: <a href="https://s2maps.eu" target="_blank">Sentinel-2 cloudless - https://s2maps.eu by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2023)</a>, CC BY-NC-SA 4.0 · Paddy: Open-SARice-10 (Zenodo 18905953), CC BY 4.0 · Groundwater: CGWB via INGRES and India Data Portal · Lines: Natural Earth; © OpenStreetMap contributors</div>
+<script type="module">
+import { addLiveGrain } from "./live_grain.js";
+import { loadFigmaStyles, applyFigmaStyles } from "./figma_styles.js";
+import { initTune } from "./hook_tune.js";
+let TUNE = null;   // the per-slide tuning panel (T), set up once the data is loaded
+const Q = new URLSearchParams(location.search);
+// Krishna's Figma styles (style_reader.py output). ?styles=<url> to try another file; ?placeholder to ignore them.
+const FIG_URL = Q.get("styles") || "../../design/figma/hook/styles.json";
+let FIG = null;
+let BASE = Q.get("base") === "neg" ? "neg" : "di";
+const OFFLINE = Q.has("offline");
+const KIT = "../../kit/", D = "data/";
+const FW = 1920, FH = 1080, PANEL = 576;     // the frames were composed at 1920 x 1080 with a 576 px text panel on the left
+
+// ============ STYLE: every value here is a placeholder, to be replaced by Krishna's Figma line styles ============
+// Line widths follow Drought Interfaces' ranking: they grow with zoom, linearly from map zoom 5 to 24.
+const grow = (a, b) => ["interpolate", ["linear"], ["zoom"], 5, a, 24, b];
+const WATER = "#1D4C65";           // DI rivers and aqueducts
+const RED = "#E00000";             // red = overdraft only. Krishna, 8 Nov: the template red (as in the A5 storyboard builds; to verify against the deck)
+const GREEN = "#3f8f45";           // paddy dots. Krishna, 8 Nov: deep paddy green
+const STYLE = {
+  ground: "hsl(222, 56%, 4%)",
+  sat: { di: { "raster-saturation": -1, "raster-contrast": 0.1 },
+         neg: { "raster-saturation": -1, "raster-contrast": 0.1, "raster-brightness-min": 1, "raster-brightness-max": 0 } },
+  studyOutline: { color: "#fff", width: grow(1.5, 18), opacity: 1 },      // DI basin outline: the strongest line
+  state:        { color: "#fff", width: grow(1.5, 24), opacity: 0.75 },   // DI states
+  district:     { color: "#fff", width: grow(0.75, 12), opacity: 0.6 },
+  block:        { color: "#fff", width: grow(0.375, 8), opacity: 0.5 },   // DI counties
+  country:      { color: "#fff", width: grow(0.75, 12), opacity: 0.5 },
+  river:        { color: WATER, width: grow(3, 75), opacity: 0.5 },
+  canal:        { color: WATER, width: grow(3, 75), opacity: 0.5, dash: [2, 1.5] },  // DI aqueducts: dashed
+  drain:        { color: WATER, width: grow(1.5, 30), opacity: 0.5, dash: [1, 1.5] },
+};
+
+// ============ LAYERS: one entry per layer, carrying its own reading guide and hover template (the Drought Interfaces pattern) ============
+const src = { cgwb: "CGWB Dynamic Ground Water Assessment 2025–26, via INGRES",
+              wells: "CGWB well readings, via India Data Portal", osm: "© OpenStreetMap contributors", ne: "Natural Earth 10m (India view)" };
+const fmt = n => Number(n).toLocaleString("en-IN");
+const month = d => new Date(d).toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+const LAYERS = {
+  india:   { name: "India", read: "India by opacity: the rest of the world is dimmed.",
+             hover: p => [p.name, null, "Country", src.ne] },
+  belt:    { name: "The Green Revolution belt", read: "Hatched: Punjab and Haryana.",
+             hover: p => ["Punjab + Haryana", "With Chandigarh", "The Green Revolution belt", src.ne] },
+  area:    { name: "Sangrur–Barnala", read: "Hatched, strongest line: the study area, 11 blocks in 2 districts.",
+             hover: p => ["Sangrur and Barnala", "2 districts, 11 blocks", "Study area", "CGWB block outlines (±150 m)"] },
+  district:{ name: "Districts", hover: p => [p.district, null, "District", src.ne] },
+  overdraft: { name: "Overdraft", read: "Red dots: the paddy in blocks that pump more than the ground gives back each year (all 11). Each block's % is on the map and on hover.",
+             hover: p => [p.block, `${p.district} district`, `Pumps <b>${p.stage_pct}%</b> of its yearly extractable groundwater (2025–26)`,
+                          `${fmt(p.extraction_ham)} ha·m pumped against ${fmt(p.extractable_ham)} ha·m extractable`,
+                          `First assessment on record, ${p.first_year}: ${p.first_stage_pct}%`, `Block · ${p.category}`, src.cgwb] },
+  blocks:  { name: "Blocks", hover: p => [p.block, `${p.district} district`, `Stage of extraction 2025–26: ${p.stage_pct}%`, `Block · ${p.category}`, src.cgwb] },
+  wells:   { name: "Monitoring wells", read: "Each tick hangs from a well; its length is the depth to water (1 m = 1 px). Two-part ticks: 9 wells read since the 1980s–90s, solid to the first reading, dashed to the latest.",
+             hover: p => [p.station_name, `${p.block} block`, `Water ${p.last_depth_m} m below ground (${month(p.last_date)})`,
+                          p.slope_m_per_yr != null ? `Falling ${p.slope_m_per_yr} m a year (2013–22, ${p.n} readings)` : `Too few readings for a trend (${p.n})`,
+                          "Monitoring well", src.wells] },
+  wellsLong: { name: "Long-record wells",
+             hover: p => [p.name, `${p.well_type}, ${p.well_depth_m} m deep · ${p.block} block`,
+                          `<b>${p.first_depth_m} m</b> below ground in ${p.first_year} → <b>${p.last_depth_m} m</b> in ${p.last_year}`,
+                          `Falling ${p.slope_m_per_yr} m a year (${p.n_years} years of readings)`,
+                          p.last_depth_m > p.well_depth_m + 0.01 ? `<span class="warn">Reading deeper than the recorded well depth: to verify</span>`
+                            : Math.abs(p.last_depth_m - p.well_depth_m) < 0.01 ? `<span class="warn">Last reading equals the well's depth: probably dry (to verify)</span>` : null,
+                          "Long-record well", "CGWB manual readings, via India Data Portal"] },
+  canals:  { name: "Canals and drains", read: "Dashed: canals (long dash) and drains (short dash). Where canal water reaches, and where it doesn't.",
+             hover: p => [p.name || "Unnamed canal", null, "Canal", src.osm] },
+  drains:  { name: "Drains", hover: p => [p.name || "Unnamed drain", null, "Drain", src.osm] },
+};
+
+// ============ TOUR: 7 steps. Frames 1-4 are Krishna's; 5-7 stay on frame 4's camera so the grain stays exact ============
+const STEPS = [
+  { frame: "f1_globe_india", title: "India", on: ["india"],
+    fact: "Punjab: 50,362 km², about 1.5% of India's land. It gave 124.14 lakh tonnes of rice to the central pool in 2023–24, about a quarter of all the rice the government bought.",
+    src: `Area: state profiles (official figure <span class="verify">to verify</span>). Rice: PIB, KMS 2023–24 (Punjab 124.14 LMT; all India at least 489.15 LMT by 24 May 2024, so Punjab's share is at most 25%).` },
+  { frame: "f2_belt", title: "The Green Revolution belt", on: ["belt"],
+    fact: "The two most over-drawn states: Punjab pumps 156.87% of its yearly extractable groundwater, Haryana 135.96%. India overall: 60.47%.",
+    src: `CGWB, National Compilation on Dynamic Ground Water Resources 2024, via RBI Handbook of Statistics on Indian States, Table 107.` },
+  { frame: "f3_punjab", title: "Punjab", on: ["area", "district"], fact: "", src: "" },
+  { frame: "f4_blocks", title: "Sangrur and Barnala: 11 blocks", on: ["area", "district", "blocks"],
+    fact: "Paddy covers 80.9% of the ground in the 11 blocks (satellite map, 2021). Official crop statistics: 81.9%.",
+    src: "Open-SARice-10 (Zenodo 18905953), 2021; DES land-use statistics via India Data Portal. Each dot's area = share of paddy under it." },
+  { frame: "f4_blocks", title: "Over the limit", on: ["area", "district", "overdraft"], labels: "pct",
+    fact: "All 11 blocks are over-exploited. Together they pump 268% of the groundwater the ground gives back each year.",
+    src: src.cgwb + ". Stage of extraction = yearly extraction ÷ yearly extractable resource." },
+  { frame: "f4_blocks", title: "The water table falls", on: ["area", "district", "blocks", "wells"],
+    fact: "Every monitoring well with enough readings is falling (23 of 23, 2013–22). Barnala: 9.2 m below ground in 1985, 45.2 m in 2023.",
+    src: src.wells + "." },
+  { frame: "f4_blocks", title: "Canal and tubewell", on: ["area", "district", "blocks", "canals"], labels: "towns",
+    fact: "Tubewells water 72% of Sangrur's irrigated land and 52% of Barnala's (2023–24). Canals water the rest.",
+    src: `DES land-use statistics 2023–24, via India Data Portal (Sangrur 183,969 of 255,448 ha; Barnala 64,824 of 123,639 ha). The canal series jumps in 2012–14: <span class="verify">to verify</span>.` },
+];
+// which map layers each switch shows
+const MAPLAYERS = {
+  base: ["countries"], india: ["india_dim", "india_line", "india_hit"],
+  belt: ["state_lines", "belt_hatch", "belt_line", "belt_hit", "rivers_ne", "cities"],
+  area: ["state_lines", "punjab_line", "canals_main", "area_hatch_f3", "area_line", "area_hit", "rivers_ne"],
+  district: ["district_line", "district_hit"], blocks: ["block_line", "block_hit", "rivers_osm"],
+  overdraft: ["block_line", "overdraft_hit", "rivers_osm"],
+  wells: ["wells_monitoring", "wells_long", "wells_m_hit", "wells_l_hit"], canals: ["canals", "drains", "canals_hit", "drains_hit", "rivers_osm"],
+  context: ["districts_ph", "drains_ph"],   // not on any slide by default: switched on per slide in the tuning panel (T)
+};
+const CITIES = [["Delhi", 77.209, 28.614], ["Chandigarh", 76.779, 30.733], ["Ludhiana", 75.857, 30.901], ["Amritsar", 74.872, 31.634],
+                ["Lahore", 74.359, 31.520], ["Sangrur", 75.844, 30.246], ["Barnala", 75.549, 30.382]];
+
+// ============ frame geometry: the 1920x1080 frame is fitted inside the window, scale s ============
+let s = 1, ox = 0, oy = 0;
+// export modes (?shot, ?svg) render at exactly 1920 x 1080, scale 1, whatever the window
+const EXPORT = Q.has("shot") || Q.has("svg");
+if (EXPORT) Object.assign(document.getElementById("map").style, { width: FW + "px", height: FH + "px", right: "auto", bottom: "auto" });
+function measure() {
+  const w = EXPORT ? FW : innerWidth, h = EXPORT ? FH : innerHeight; s = Math.min(w / FW, h / FH); ox = (w - FW * s) / 2; oy = (h - FH * s) / 2;
+  const P = document.getElementById("panel"); P.style.left = ox + "px"; P.style.width = PANEL * s + "px";
+  P.style.top = oy + "px"; P.style.bottom = oy + "px";
+}
+measure();
+const dz = () => Math.log2(s);    // zoom offset that reproduces the frame at scale s
+const projection = () => ({ type: ["interpolate", ["linear"], ["zoom"], 5.5 + dz(), "vertical-perspective", 6.5 + dz(), "mercator"] });
+
+const line = (id, source, st, filter) => ({ id, type: "line", source, ...(filter ? { filter } : {}), layout: { "line-join": "round", "line-cap": st.dash ? "butt" : "round" },
+  paint: { "line-color": st.color, "line-width": st.width, "line-opacity": st.opacity, ...(st.dash ? { "line-dasharray": st.dash } : {}) } });
+const hit = (id, source, kind = "fill", filter) => kind === "fill"
+  ? { id, type: "fill", source, ...(filter ? { filter } : {}), paint: { "fill-opacity": 0 } }
+  : { id, type: "line", source, paint: { "line-width": 12, "line-opacity": 0 } };
+const satURL = OFFLINE ? "../tiles/eox/{z}/{x}/{y}.jpg" : "https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2023_3857/default/GoogleMapsCompatible/{z}/{y}/{x}.jpg";
+
+// the cameras of Krishna's four frames, exactly as exported by the drawing kit
+const CAM = {};
+let step = Math.max(0, Math.min(STEPS.length - 1, (+Q.get("step") || 1) - 1));
+const camFor = F => { const c = CAM[F]; return { center: c.center, zoom: c.zoom + dz(), pitch: c.pitch, bearing: c.bearing,
+  padding: { top: c.padding.top * s, bottom: c.padding.bottom * s, left: c.padding.left * s, right: c.padding.right * s } }; };
+await Promise.all([...new Set(STEPS.map(x => x.frame))].map(async F => { CAM[F] = await (await fetch(KIT + `out/${F}_camera.json`)).json(); }));
+
+// ?shot=a,b,c captures those steps (map only, no panel) to kit/out/hook_step<n>_<base>.png via kit/save_server.py (port 8767)
+const SHOT = Q.get("shot");
+const SAVE_PORT = Q.get("save") || "8767";   // the kit receiver's port (?save=8768 if 8767 is taken)
+const map = new maplibregl.Map({
+  container: "map", attributionControl: false, maxPitch: 70, ...camFor(STEPS[step].frame),
+  ...(EXPORT ? { pixelRatio: 1, canvasContextAttributes: { preserveDrawingBuffer: true } } : {}),
+  style: { version: 8, projection: projection(),
+    sources: {
+      eox: { type: "raster", tileSize: 256, maxzoom: OFFLINE ? 13 : 14, tiles: [satURL] },
+      countries: { type: "geojson", data: KIT + "data/countries.geojson" }, india: { type: "geojson", data: KIT + "data/india.geojson" },
+      state_lines: { type: "geojson", data: KIT + "data/india_state_lines.geojson" }, punjab: { type: "geojson", data: KIT + "data/punjab.geojson" },
+      belt: { type: "geojson", data: KIT + "data/belt_punjab_haryana.geojson" }, rivers_ne: { type: "geojson", data: KIT + "data/rivers.geojson" },
+      canals_main: { type: "geojson", data: KIT + "data/canals_main.geojson" }, districts: { type: "geojson", data: KIT + "data/districts_sangrur_barnala.geojson" },
+      area: { type: "geojson", data: KIT + "data/area_outline.geojson" }, blocks: { type: "geojson", data: D + "blocks.geojson" },
+      wells_m: { type: "geojson", data: D + "wells_monitoring.geojson" }, wells_l: { type: "geojson", data: D + "wells_long.geojson" },
+      canals: { type: "geojson", data: D + "canals.geojson" }, drains: { type: "geojson", data: D + "drains.geojson" },
+      rivers_osm: { type: "geojson", data: "../../data/map/osm_rivers.geojson" },
+      // outside the belt (Krishna, 10 Nov): district outlines of Punjab + Haryana, geoBoundaries 2021 (Data_Verification/13_hook_context)
+      districts_ph: { type: "geojson", data: D + "districts_ph.geojson" },
+      drains_ph: { type: "geojson", data: D + "drains_ph.geojson" },        // OSM drains across Punjab + Haryana (fetched 10 Nov)
+    },
+    layers: [
+      // opacity just under 1 keeps the ground in MapLibre's ordered (translucent) pass: an opaque background is drawn first and
+      // would hide, by depth test, the live grain's hidden passes that sit beneath it (live_grain.js)
+      { id: "ground", type: "background", paint: { "background-color": STYLE.ground, "background-opacity": 0.999 } },
+      { id: "sat", type: "raster", source: "eox", paint: { ...STYLE.sat[BASE], "raster-fade-duration": 0 } },
+      // (the live grain is inserted here, under everything drawn: live_grain.js)
+      { id: "india_dim", type: "fill", source: "countries", filter: ["!=", ["get", "name"], "India"], paint: { "fill-color": "#000", "fill-opacity": 0.6 } },
+      { id: "belt_hatch", type: "fill", source: "belt", paint: { "fill-pattern": "hatch" } },
+      { id: "area_hatch_f3", type: "fill", source: "area", paint: { "fill-pattern": "hatch" } },
+      line("rivers_ne", "rivers_ne", { ...STYLE.river, width: grow(1, 25) }),
+      line("rivers_osm", "rivers_osm", STYLE.river),
+      line("canals_main", "canals_main", { ...STYLE.canal, width: grow(1, 25) }),
+      line("drains_ph", "drains_ph", { ...STYLE.drain, width: grow(1, 20), opacity: 0.4 }),
+      line("drains", "drains", STYLE.drain), line("canals", "canals", STYLE.canal),
+      line("countries", "countries", STYLE.country),
+      line("districts_ph", "districts_ph", { ...STYLE.district, width: grow(0.5, 8), opacity: 0.45 }),
+      line("state_lines", "state_lines", { ...STYLE.state, width: grow(0.75, 12), opacity: 0.5 }),
+      line("india_line", "india", STYLE.state), line("punjab_line", "punjab", STYLE.state), line("belt_line", "belt", STYLE.studyOutline),
+      line("block_line", "blocks", STYLE.block), line("district_line", "districts", STYLE.district), line("area_line", "area", STYLE.studyOutline),
+      { id: "wells_monitoring", type: "circle", source: "wells_m", paint: { "circle-color": "#fff", "circle-radius": 2.5 } },
+      { id: "wells_long", type: "circle", source: "wells_l", paint: { "circle-color": "#fff", "circle-radius": 3 } },
+      { id: "wells_m_hit", type: "circle", source: "wells_m", paint: { "circle-radius": 9, "circle-opacity": 0 } },
+      { id: "wells_l_hit", type: "circle", source: "wells_l", paint: { "circle-radius": 9, "circle-opacity": 0 } },
+      // invisible hit areas so thin lines and outlines are easy to hover
+      hit("india_hit", "india"), hit("belt_hit", "belt"), hit("area_hit", "area"), hit("district_hit", "districts"),
+      hit("block_hit", "blocks"), hit("overdraft_hit", "blocks"), hit("canals_hit", "canals", "line"), hit("drains_hit", "drains", "line"),
+    ] },
+});
+const ALL = [...new Set(Object.values(MAPLAYERS).flat())].filter(id => id !== "cities");
+// hover: map layer -> LAYERS entry, in priority order (points first, then lines, then areas)
+const HOVER = [["wells_l_hit", "wellsLong"], ["wells_m_hit", "wells"], ["canals_hit", "canals"], ["drains_hit", "drains"],
+               ["overdraft_hit", "overdraft"], ["block_hit", "blocks"], ["district_hit", "district"], ["area_hit", "area"], ["belt_hit", "belt"], ["india_hit", "india"]];
+
+// ============ wells as down-ticks (Krishna, 8 Nov): a tick hangs from each well; length = depth to water, 1 m = 1 px at frame scale ============
+// Drawn in an SVG over the map and redrawn every frame. Long-record wells: solid to the first reading, dashed on to the latest.
+const TICK = { pxPerM: 1, width: 3, longThin: 1.5, dash: "4 3", colour: "#fff", opacity: 0.9 };
+const ticksSvg = document.getElementById("ticks");
+function drawTicks() {
+  if (!DATA.wellsM || !DATA.wellsL || map.getLayoutProperty("wells_monitoring", "visibility") === "none") { ticksSvg.innerHTML = ""; return; }
+  const k = TICK.pxPerM * s, r1 = v => Math.round(v * 10) / 10;
+  let out = `<g id="wells_ticks" stroke="${TICK.colour}" stroke-opacity="${TICK.opacity}" stroke-width="${r1(TICK.width * s)}" stroke-linecap="butt">`;
+  for (const f of DATA.wellsM.features) { const q = map.project(f.geometry.coordinates), y = q.y + 2.5;
+    out += `<line x1="${r1(q.x)}" y1="${r1(y)}" x2="${r1(q.x)}" y2="${r1(y + f.properties.last_depth_m * k)}"/>`; }
+  out += `</g><g id="wells_long_ticks" stroke="${TICK.colour}" stroke-opacity="${TICK.opacity}" stroke-linecap="butt">`;
+  for (const f of DATA.wellsL.features) { const q = map.project(f.geometry.coordinates), y = q.y + 3, p = f.properties;
+    out += `<line x1="${r1(q.x)}" y1="${r1(y)}" x2="${r1(q.x)}" y2="${r1(y + p.first_depth_m * k)}" stroke-width="${r1(TICK.width * s)}"/>`
+         + `<line x1="${r1(q.x)}" y1="${r1(y + p.first_depth_m * k)}" x2="${r1(q.x)}" y2="${r1(y + p.last_depth_m * k)}" stroke-width="${r1(TICK.longThin * s)}" stroke-dasharray="${TICK.dash}"/>`; }
+  ticksSvg.innerHTML = out + "</g>";
+}
+
+// ============ the overdraft: dots inside the 11 blocks turn red (Krishna, 8 Nov), fading over 0.8 s ============
+let dots = null, redAnim = 0;
+function setRed(target) {
+  cancelAnimationFrame(redAnim); let last = performance.now();
+  const tick = now => { const dt = (now - last) / 800; last = now;
+    dots.red = target > dots.red ? Math.min(target, dots.red + dt) : Math.max(target, dots.red - dt); map.triggerRepaint();
+    if (dots.red !== target) redAnim = requestAnimationFrame(tick); };
+  redAnim = requestAnimationFrame(tick);
+}
+
+// ============ tour ============
+function atStop() {
+  const c = camFor(STEPS[step].frame), p = map.getPadding();
+  const a = map.project(map.getCenter()), b = map.project(c.center);
+  return Math.hypot(a.x - b.x, a.y - b.y) < 0.75 && Math.abs(map.getZoom() - c.zoom) < 0.002 && Math.abs(map.getPitch() - c.pitch) < 0.05
+         && Math.abs(map.getBearing() - c.bearing) < 0.05 && Math.abs(p.left - c.padding.left) < 0.5;
+}
+map.on("render", drawTicks);
+
+let labels = [];
+function setLabels(kind) {
+  labels.forEach(m => m.remove()); labels = [];
+  const add = (txt, ll, cls) => { const e = document.createElement("div"); e.className = "lbl " + (cls || ""); e.innerHTML = txt;
+    labels.push(new maplibregl.Marker({ element: e, anchor: cls === "pct" ? "center" : "left" }).setLngLat(ll).addTo(map)); };
+  if (kind === "cities") CITIES.forEach(([n, lo, la]) => add(n, [lo, la]));
+  if (kind === "pct") DATA.blocks.features.forEach(f => add(`${f.properties.block}<br>${Math.round(f.properties.stage_pct)}%`, [f.properties.label_lon, f.properties.label_lat], "pct"));
+  if (kind === "towns") DATA.towns.features.forEach(f => add(f.properties.name, f.geometry.coordinates));
+}
+
+function render(fly) {
+  const S = STEPS[step];
+  const want = new Set(MAPLAYERS.base); S.on.forEach(k => MAPLAYERS[k].forEach(id => want.add(id)));
+  for (const id of ALL) map.setLayoutProperty(id, "visibility", want.has(id) ? "visible" : "none");
+  // the hatch: the belt in frame 2, the study area in frame 3 (Krishna: same hatch for both); none at block scale
+  map.setLayoutProperty("area_hatch_f3", "visibility", S.frame === "f3_punjab" ? "visible" : "none");
+  // place names now come from the tuning panel's places list (per slide); only the block percentages stay here
+  setLabels(S.labels === "pct" ? "pct" : null);
+  setRed(S.on.includes("overdraft") ? 1 : 0);
+  if (TUNE) { TUNE.apply(step); TUNE.refresh(); }
+  applyFigmaStyles(FIG, { map, step, s, dz: dz(), TICK, dots, base: new URL(".", new URL(FIG_URL, location.href)).href })
+    .then(() => { if (TUNE) TUNE.apply(step); drawTicks(); });
+  drawTicks();
+  const c = camFor(S.frame);
+  if (fly) { if (!atStop()) map.flyTo({ ...c, duration: 2600, essential: true }); } else map.jumpTo(c);
+  // panel
+  document.getElementById("count").textContent = `Step ${step + 1} of ${STEPS.length}`;
+  document.getElementById("title").textContent = S.title;
+  document.getElementById("fact").textContent = S.fact;
+  document.getElementById("src").innerHTML = S.src ? "Source: " + S.src : "";
+  document.getElementById("key").innerHTML = S.on.filter(k => LAYERS[k].read).map(k => `<div><b>${LAYERS[k].name}</b>${LAYERS[k].read}</div>`).join("")
+    + (S.frame !== "f1_globe_india" ? `<div><b>Grain</b>One dot every 4 px; its area = the share of paddy in the ground under it (2021).</div>` : "");
+  document.getElementById("dots").innerHTML = STEPS.map((_, i) => `<i class="${i === step ? "on" : ""}" title="Step ${i + 1}" data-i="${i}"></i>`).join("");
+  document.getElementById("prev").disabled = step === 0; document.getElementById("next").disabled = step === STEPS.length - 1;
+  history.replaceState(null, "", "?" + new URLSearchParams({ ...Object.fromEntries(Q), step: step + 1 }));
+}
+const go = i => { if (i < 0 || i >= STEPS.length) return; step = i; render(true); };
+
+// ============ hover ============
+const pop = new maplibregl.Popup({ closeButton: false, closeOnClick: false, anchor: "left", offset: 14, className: "hov" });
+map.on("mousemove", e => {
+  const vis = HOVER.filter(([id]) => map.getLayoutProperty(id, "visibility") !== "none");
+  const fs = map.queryRenderedFeatures(e.point, { layers: vis.map(v => v[0]) });
+  if (!fs.length) { pop.remove(); map.getCanvas().style.cursor = ""; return; }
+  const f = vis.map(([id, key]) => [fs.find(x => x.layer.id === id), key]).find(([x]) => x);
+  const [name, sub, ...rest] = LAYERS[f[1]].hover(f[0].properties).filter(x => x !== null);
+  const source = rest.pop(), type = rest.pop();
+  pop.setLngLat(e.lngLat).setHTML(`<p>${name}</p>${sub ? `<p>${sub}</p>` : ""}${rest.map(r => `<p>${r}</p>`).join("")}<p class="type">Type: ${type}</p><p class="src">${source}</p>`).addTo(map);
+  map.getCanvas().style.cursor = "default";
+});
+map.on("mouseout", () => pop.remove());
+
+// ============ controls ============
+document.getElementById("prev").onclick = () => go(step - 1);
+document.getElementById("next").onclick = () => go(step + 1);
+document.getElementById("dots").onclick = e => { if (e.target.dataset.i) go(+e.target.dataset.i); };
+document.getElementById("home").onclick = () => map.flyTo({ ...camFor(STEPS[step].frame), duration: 1200 });
+document.getElementById("zin").onclick = () => map.zoomIn(); document.getElementById("zout").onclick = () => map.zoomOut();
+addEventListener("keydown", e => {
+  if (e.key === "t" || e.key === "T") { if (TUNE) TUNE.toggle(); return; }
+  if (e.target.closest && e.target.closest("#tune")) return;     // keys adjust the focused control in the tuning panel
+  if (e.key === "ArrowRight" || e.key === " ") { e.preventDefault(); go(step + 1); }
+  if (e.key === "ArrowLeft") go(step - 1);
+  if (e.key === "h" || e.key === "H") document.getElementById("home").click();
+  if (e.key === "f" || e.key === "F") toggleFps();
+  if (e.key === "b" || e.key === "B") { BASE = BASE === "di" ? "neg" : "di"; const all = { ...STYLE.sat.di, ...STYLE.sat.neg };
+    for (const k in all) map.setPaintProperty("sat", k, k in STYLE.sat[BASE] ? STYLE.sat[BASE][k] : null);
+    Q.set("base", BASE); history.replaceState(null, "", "?" + Q.toString()); }
+});
+addEventListener("resize", () => { measure(); if (!window.HOOK) return; map.setProjection(projection()); map.jumpTo(camFor(STEPS[step].frame)); });
+
+// F: frame-rate readout, to check the live grain on the presenting machine (it should stay near 60 while flying)
+let fpsEl = null;
+function toggleFps() {
+  if (fpsEl) { fpsEl.remove(); fpsEl = null; return; }
+  fpsEl = Object.assign(document.createElement("div"), { style: "position:absolute;right:50px;bottom:30px;z-index:5;font:12px Arial;color:#ffcf6b" });
+  document.body.append(fpsEl);
+  let n = 0, t0 = performance.now();
+  const count = () => { n++; }; map.on("render", count);
+  const show = () => { if (!fpsEl) { map.off("render", count); return; } const t = performance.now();
+    fpsEl.textContent = `${Math.round(n * 1000 / (t - t0))} frames/s (map redraws; 0 when still)`; n = 0; t0 = t; setTimeout(show, 1000); };
+  show();
+}
+
+// ============ start ============
+const DATA = {};
+function hatchImage() {   // placeholder hatch: thin white diagonals, 8 px apart
+  const n = 8, c = document.createElement("canvas"); c.width = c.height = n; const g = c.getContext("2d");
+  g.strokeStyle = "rgba(255,255,255,0.7)"; g.lineWidth = 1; g.beginPath(); g.moveTo(0, n); g.lineTo(n, 0); g.moveTo(-1, 1); g.lineTo(1, -1); g.moveTo(n - 1, n + 1); g.lineTo(n + 1, n - 1); g.stroke();
+  return g.getImageData(0, 0, n, n);
+}
+map.on("load", async () => {
+  map.addImage("hatch", hatchImage());
+  dots = addLiveGrain(map, { before: "india_dim", blocksSource: "blocks", shareTiles: new URL("../tiles/paddy_share/{z}/{x}/{y}.png", location.href).href.replace(/%7B/g, "{").replace(/%7D/g, "}"),
+                             green: GREEN, redColour: RED, rmax: 1.9, pitch: 4, scale: () => s, dz });
+  const grain = dots;   // the export modes wait for grain.op === 1 (always, now)
+  if (!Q.has("placeholder")) FIG = await loadFigmaStyles(FIG_URL);
+  if (FIG) document.getElementById("placeholder").textContent = "Figma styles: " + FIG.files.length + " files";
+  for (const [k, f] of [["blocks", "blocks"], ["towns", "towns"], ["wellsM", "wells_monitoring"], ["wellsL", "wells_long"], ["places", "places"]]) DATA[k] = await (await fetch(D + f + ".geojson")).json();
+  // tuning panel (T): per-slide lines and places. Defaults reproduce the tour as it was: slide 2 shows the 7 cities, slide 7 the belt towns.
+  const cityNames = new Set(CITIES.map(c => c[0])), townNames = new Set(DATA.towns.features.map(f => f.properties.name));
+  TUNE = initTune({ map, steps: STEPS, getStep: () => step, scale: () => s, places: DATA.places,
+    defaultOn: (id, st) => { const want = new Set(MAPLAYERS.base); STEPS[st].on.forEach(k => MAPLAYERS[k].forEach(x => want.add(x))); return want.has(id); },
+    defaultHatch: (id, st) => id === "belt_hatch" ? STEPS[st].on.includes("belt") : STEPS[st].frame === "f3_punjab",
+    defaultPlaces: (name, st) => (STEPS[st].on.includes("belt") && cityNames.has(name)) || (STEPS[st].labels === "towns" && townNames.has(name)) });
+  // baked defaults: hook_tune.json (Krishna's settings, once sent); ?tunefile=x.json loads another file and always wins (for stills)
+  try { const tf = Q.get("tunefile") || "hook_tune.json", base = await fetch(tf);
+        if (base.ok && (Q.has("tunefile") || !localStorage.getItem("hookTune"))) TUNE.load(await base.json()); } catch (e) {}
+  render(false);
+  document.title = "Shifting Ground Hook";   // ready
+  window.HOOK = { map, go, STEPS, grain, dots, atStop };
+  if (Q.has("svg")) {   // editable SVGs for Krishna: kit/out/hook_step<n>.svg + hook_components.svg (see kit/hook_svg/README.md)
+    try {
+      const { exportAll } = await import("./export_svg.js?v=" + Date.now());
+      const post = async (name, body) => { const r = await fetch(`http://localhost:${SAVE_PORT}/save?name=${name}`, { method: "POST", body }); if (!r.ok) throw new Error("save failed " + name); };
+      await exportAll({ map, STEPS, MAPLAYERS, CITIES, DATA, LAYERS, grain, post, wait: ms => new Promise(r => setTimeout(r, ms)),
+                        jump: i => { step = i; render(false); } });
+      document.title = "SVG DONE";
+    } catch (e) { document.title = "SVG ERROR " + e.message; console.error(e); }
+  }
+  if (SHOT) {
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    try {
+      for (const n of SHOT.split(",").map(Number)) {
+        step = n - 1; render(false);
+        const t0 = Date.now();
+        do { await wait(1000); } while ((!map.areTilesLoaded() || grain.op < 1) && Date.now() - t0 < 60000);
+        await new Promise(r => { map.once("render", r); map.triggerRepaint(); });
+        const png = await new Promise(r => map.getCanvas().toBlob(r, "image/png"));
+        const res = await fetch(`http://localhost:${SAVE_PORT}/save?name=hook_step${n}_${BASE}.png`, { method: "POST", body: png });
+        if (!res.ok) throw new Error("save failed");
+      }
+      document.title = "SHOT DONE";
+    } catch (e) { document.title = "SHOT ERROR " + e.message; }
+  }
+});
+</script>
+</body>
+</html>

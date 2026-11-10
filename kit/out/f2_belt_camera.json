@@ -1,0 +1,26 @@
+{
+ "frame": "f2_belt",
+ "title": "South Asia, tilted: Punjab + Haryana",
+ "center": [
+  76.2,
+  29.6
+ ],
+ "zoom": 4.9,
+ "pitch": 40,
+ "bearing": 0,
+ "padding": {
+  "top": 0,
+  "bottom": 0,
+  "left": 576,
+  "right": 0
+ },
+ "text_panel_px": [
+  0,
+  576
+ ],
+ "size": [
+  1920,
+  1080
+ ],
+ "maplibre": "5.24.0"
+}

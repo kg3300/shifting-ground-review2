@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Collage timeline</title>
+<!-- Act 2 of the Review 2 piece: the collage timeline (Krishna's design: sketches and decisions of 9–10 Nov).
+     The whole collage is one halftone (overlaps multiplied, square grid, black on white). A window travels along the
+     timeline; inside it the dots open onto the photographs as laid out in Figma.
+     Moving: hold → (or ←) and the window travels through the images; it stops by itself at each text stop, where the card
+     appears at the top; press again to carry on. Let go to pause anywhere. PageDown / PageUp / Space (a clicker) glide stop to stop.
+     Below the collage: a through line with the decades and a marker for the window. Bottom right, in red (overdraft only):
+     the belt's water table at the year the window has reached.
+     Inputs: layout.json (positions from Figma frame 29:81), img/*.png (exports), beats.json (stops + card text), water.json (well data).
+     Settings: Krishna's values from 10 Nov are the defaults. Press T for the tuning panel; changes are remembered in that browser. -->
+<style>
+  /* Krishna's layout from Figma (frame 48:2, 10 Nov), in px of a 1920 x 1080 screen: --u is one such px on this screen,
+     and --oy centres the 16:9 layout vertically on screens of another shape */
+  :root { --red:#c8102e; --ink:#000; --grey:#6b6b6b;
+          --u: min(calc(100vw / 1920), calc(100vh / 1080)); --oy: calc((100vh - 1080 * var(--u)) / 2); }
+  html, body { margin:0; height:100%; background:#fff; overflow:hidden; color:var(--ink);
+               font-family: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif; }
+  canvas { display:block; width:100vw; height:100vh; touch-action:none; }
+  /* the card at the top */
+  #card { position:fixed; left:calc(30 * var(--u)); top:calc(var(--oy) + 30 * var(--u)); width:calc(1000 * var(--u));
+          opacity:0; transition:opacity .45s ease; pointer-events:none; }
+  #card.on { opacity:1; }
+  #card .kicker { color:var(--red); font-weight:700; font-size:calc(15 * var(--u)); letter-spacing:.1em; text-transform:uppercase; }
+  #card .title { font-weight:800; font-style:italic; font-size:calc(34 * var(--u)); line-height:1.15; text-transform:uppercase;
+                 margin:calc(8 * var(--u)) 0 calc(12 * var(--u)); }
+  #card .body { font-size:calc(16 * var(--u)); line-height:1.45; }
+  #card .today { font-size:calc(16 * var(--u)); line-height:1.45; font-weight:700; margin-top:calc(20 * var(--u)); }
+  #card .source { color:var(--grey); font-size:calc(12 * var(--u)); margin-top:calc(10 * var(--u)); }
+  /* the water table, bottom right */
+  #water { position:fixed; right:calc(30 * var(--u)); bottom:calc(var(--oy) + 30 * var(--u)); text-align:right; color:var(--red); pointer-events:none; }
+  #water .num { font-weight:800; font-size:calc(52 * var(--u)); line-height:1; font-variant-numeric:tabular-nums; }
+  #water .lab { font-size:calc(12 * var(--u)); font-weight:700; letter-spacing:.06em; text-transform:uppercase; margin-top:calc(4 * var(--u)); }
+  #water .src { color:var(--grey); font-size:calc(11 * var(--u)); margin-top:calc(2 * var(--u)); }
+  /* tuning panel */
+  #tune { position:fixed; right:12px; top:12px; width:280px; background:#fff; border:1px solid #000; padding:10px 12px;
+          font:12px/1.4 Inter, "Helvetica Neue", Arial, sans-serif; display:none; max-height:88vh; overflow:auto; z-index:5; }
+  #tune.on { display:block; }
+  #tune b { display:block; margin-bottom:4px; }
+  #tune label { display:block; margin:6px 0 0; }
+  #tune input[type=range] { width:100%; }
+  #tune select { width:100%; font:inherit; }
+  #tune pre { white-space:pre-wrap; word-break:break-all; font-size:11px; color:#555; margin:8px 0 0; }
+  #tune button { font:inherit; margin-top:6px; border:1px solid #000; background:#fff; padding:3px 8px; cursor:pointer; }
+  .bare #card, .bare #water { display:none; }
+  #hint { display:none; }   /* hidden for the talk (Krishna, 10 Nov); the controls are in the code comment at the top */
+  #hint { position:fixed; left:calc(77 * var(--u)); bottom:calc(var(--oy) + 30 * var(--u)); font-size:11px; color:#9a9a9a; transition:opacity .6s; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="card"><div class="kicker"></div><div class="title"></div><div class="body"></div><div class="today"></div><div class="source"></div></div>
+<div id="water"><div class="num">–</div><div class="lab">Water below ground</div><div class="src"></div></div>
+<div id="tune"><b>Tuning (T to hide)</b><div id="sliders"></div><pre id="vals"></pre><button id="reset">Back to defaults</button></div>
+<div id="hint">Hold → to travel through time, ← to go back · T: tuning</div>
+
+<script>
+// ---------- settings: Krishna's tuned values (10 Nov) are the defaults ----------
+const DEF = { spacing: 3.5, dot: 0.55, gamma: 2, size: 1.4, feather: 0.25, part: 0.35, glide: 3,
+              breathe: "off", bRadius: 30, bAmp: 0, bSpeed: 0.5,
+              shape: "circle", aspect: 0.5, scrollMode: "free", sens: 210, freeSpeed: 0.1,
+              posX: 0.5, posY: -0.03, outline: "off", input: "both", travel: 4 };
+const SELECTS = [
+  ["shape", "Window shape", [["circle", "circle"], ["rect", "rectangle"]]],
+  ["outline", "Window outline (to see it while tuning)", [["off", "hidden"], ["on", "shown"]]],
+  ["input", "Move with", [["both", "arrow keys and scrolling"], ["keys", "arrow keys only"]]],
+  ["scrollMode", "Scrolling", [["snap", "snap to stops"], ["free", "free (moves with the scroll)"]]],
+  ["breathe", "Breathe", [["off", "off"], ["rim", "along the window's edge"], ["cursor", "around the cursor"]]],
+];
+const SLIDERS = [
+  ["spacing", "Dot spacing (px on screen)", 1, 16, 0.5, true],
+  ["dot", "Dot size at full black (× spacing)", 0.3, 0.8, 0.01, true],
+  ["gamma", "Contrast (gamma)", 0.4, 2.5, 0.05, true],
+  ["travel", "Arrow keys: travel speed (years per second)", 0.5, 15, 0.5],
+  ["posX", "Window position across the screen (0 = left edge, 1 = right)", 0.05, 0.95, 0.01],
+  ["posY", "Window up / down (× strip height, 0 = centred)", -0.5, 0.5, 0.01],
+  ["size", "Window height (× strip height)", 0.4, 1.6, 0.02],
+  ["aspect", "Rectangle width (× its height)", 0.5, 3, 0.05],
+  ["feather", "Window edge softness", 0, 0.8, 0.01],
+  ["part", "Curtain: dots shrink away inside the window", 0, 1, 0.05],
+  ["glide", "Clicker / snap: glide time between stops (s)", 0.3, 3, 0.1],
+  ["sens", "Snap: scroll needed to move one stop", 10, 400, 10],
+  ["freeSpeed", "Free scroll: speed", 0.1, 5, 0.1],
+  ["bRadius", "Breathe radius (px)", 30, 400, 5],
+  ["bAmp", "Breathe strength", 0, 1.5, 0.05],
+  ["bSpeed", "Breathe speed", 0.5, 6, 0.1],
+];
+let P = { ...DEF };
+try { Object.assign(P, JSON.parse(localStorage.getItem("collageTune") || "{}")); } catch (e) {}
+const save = () => { try { localStorage.setItem("collageTune", JSON.stringify(P)); } catch (e) {} };
+
+// ---------- data ----------
+const loadImg = src => new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = src; });
+const BARE = new URLSearchParams(location.search).has("bare");
+if (BARE) document.documentElement.classList.add("bare");
+const PANEL = 1327;                // board px per decade panel: the 1960s panel starts at x = 0
+const yearAt = x => 1960 + x / PANEL * 10;
+let W = 1, H = 1, YEARS = [], STOPS = [], WATER = [];
+const dotsComp = document.createElement("canvas");    // all photos, greyscale, overlaps multiplied: the source of the dots
+const photoComp = document.createElement("canvas");   // all photos as laid out in Figma (upper covers lower): shown inside the window
+
+async function load() {
+  const [L, B, Wt] = await Promise.all(["layout.json", "beats.json", "water.json"].map(f => fetch(f).then(r => r.json())));
+  const b = L.band; W = b.w; H = b.h;
+  YEARS = L.years.map(y => ({ t: y.t, x: y.x - b.x + y.w / 2 }));
+  STOPS = B.beats.map(s => ({ ...s, x: s.x - b.x }));
+  WATER = Wt.years;
+  const ims = await Promise.all(L.images.map(d => loadImg("img/" + d.f + ".png")));
+  for (const [cv, op] of [[dotsComp, "multiply"], [photoComp, "source-over"]]) {
+    cv.width = W; cv.height = H;
+    const x = cv.getContext("2d");
+    x.fillStyle = "#fff"; x.fillRect(0, 0, W, H);
+    x.globalCompositeOperation = op; x.filter = "grayscale(1)";
+    L.images.forEach((d, i) => { if (ims[i]) x.drawImage(ims[i], d.x - b.x, d.y - b.y, d.w, d.h); });
+    x.filter = "none"; x.globalCompositeOperation = "source-over";
+  }
+  return ims.filter(Boolean).length;
+}
+
+// water table at a (fractional) year: straight line between recorded years; before 1985, the first reading
+function waterAt(y) {
+  if (y <= WATER[0].y) return { m: WATER[0].m, note: "first recorded " + WATER[0].y };
+  const last = WATER[WATER.length - 1];
+  if (y >= last.y) return { m: last.m, note: "latest reading " + last.y };
+  for (let i = 1; i < WATER.length; i++) if (WATER[i].y >= y) {
+    const a = WATER[i - 1], b = WATER[i], k = (y - a.y) / (b.y - a.y);
+    return { m: a.m + (b.m - a.m) * k, note: String(Math.floor(y)) };
+  }
+}
+
+// darkness grid at world spacing gw (the browser's downscale averages each cell)
+const levels = new Map();
+function level(gw) {
+  const key = gw.toFixed(3);
+  if (levels.has(key)) return levels.get(key);
+  if (levels.size > 8) levels.clear();
+  const cols = Math.max(1, Math.round(W / gw)), rows = Math.max(1, Math.round(H / gw));
+  const c = document.createElement("canvas"); c.width = cols; c.height = rows;
+  const x = c.getContext("2d", { willReadFrequently: true });
+  x.imageSmoothingEnabled = true; x.imageSmoothingQuality = "high";
+  x.drawImage(dotsComp, 0, 0, cols, rows);
+  const d = x.getImageData(0, 0, cols, rows).data, dark = new Float32Array(cols * rows);
+  for (let i = 0; i < dark.length; i++) dark[i] = 1 - d[i * 4] / 255;
+  const Lv = { cols, rows, gx: W / cols, gy: H / rows, dark };
+  levels.set(key, Lv); return Lv;
+}
+
+// dots for view v (screen = world * v.s + v.ox, y relative to the strip top) inside box; fx(x, y, r) may return a new radius
+function drawDots(g, v, fx, box) {
+  const Lv = level(P.spacing / v.s), gs = Lv.gx * v.s;
+  const i0 = Math.max(0, Math.floor((box.x0 - v.ox) / v.s / Lv.gx) - 1), i1 = Math.min(Lv.cols, Math.ceil((box.x1 - v.ox) / v.s / Lv.gx) + 1);
+  const j0 = Math.max(0, Math.floor(box.y0 / v.s / Lv.gy) - 1), j1 = Math.min(Lv.rows, Math.ceil(box.y1 / v.s / Lv.gy) + 1);
+  const rmax = P.dot * gs, gam = P.gamma, small = gs < 2.5;
+  g.fillStyle = "#000";
+  for (let j = j0; j < j1; j++) {
+    if ((j - j0) % 8 === 0) { if (j > j0) g.fill(); g.beginPath(); }   // fill in bands: one huge path silently draws nothing
+    const sy = (j + 0.5) * Lv.gy * v.s;
+    for (let i = i0; i < i1; i++) {
+      const d = Lv.dark[j * Lv.cols + i]; if (d < 0.03) continue;
+      const sx = (i + 0.5) * Lv.gx * v.s + v.ox;
+      let r = rmax * Math.sqrt(Math.pow(d, gam));
+      if (fx) r = fx(sx, sy, r);                   // returns the radius only: no new object per dot, so no garbage-collection stutter
+      if (r < 0.15) continue;
+      if (small) { const a = r * 0.886; g.rect(sx - a, sy - a, 2 * a, 2 * a); }
+      else { g.moveTo(sx + r, sy); g.arc(sx, sy, r, 0, 6.2832); }
+    }
+  }
+  g.fill();
+}
+
+// ---------- layout: card on top, collage below it, through line and decades under the collage ----------
+const cv = document.getElementById("c"), ctx = cv.getContext("2d");
+let u = 1, dpr = 1, cssW = 0, cssH = 0, s = 1, stripH = 0, stripTop = 0, lineY = 0, tiles = [];
+const lens = document.createElement("canvas"), lctx = lens.getContext("2d");
+
+function layout() {
+  dpr = devicePixelRatio || 1; cssW = innerWidth; cssH = innerHeight;
+  cv.width = Math.round(cssW * dpr); cv.height = Math.round(cssH * dpr);
+  // Krishna's layout (Figma frame 48:2), in px of a 1920 x 1080 screen: collage 659 tall from y = 243, through line at y = 913
+  u = Math.min(cssW / 1920, cssH / 1080); const oy = (cssH - 1080 * u) / 2;
+  stripH = Math.round(659 * u); s = stripH / H;
+  stripTop = Math.round((oy + 243 * u) * dpr) / dpr;   // whole device pixels, like the still dot tiles
+  lineY = oy + 913 * u - stripTop;                      // the through line, in strip coordinates
+  buildTiles();
+}
+// the still dot field for the whole strip, cut into tiles narrow enough for any graphics card
+function buildTiles() {
+  levels.clear();
+  const fullW = Math.ceil(W * s), tw = Math.floor(4000 / dpr);
+  tiles = [];
+  for (let x0 = 0; x0 < fullW; x0 += tw) {
+    const w = Math.min(tw, fullW - x0), c = document.createElement("canvas");
+    c.width = Math.ceil(w * dpr); c.height = Math.ceil(stripH * dpr);
+    const g = c.getContext("2d");
+    g.setTransform(dpr, 0, 0, dpr, -x0 * dpr, 0);
+    g.fillStyle = "#fff"; g.fillRect(x0, 0, w, stripH);
+    drawDots(g, { s, ox: 0 }, null, { x0, y0: 0, x1: x0 + w, y1: stripH });
+    tiles.push({ c, x0 });
+  }
+  dirty = true;
+}
+
+// ---------- motion ----------
+let idx = 0, cxW = 0, target = 0, anim = null, dirty = true, mouse = null, cooldown = 0, lastDraw = 0;
+let hold = 0, vel = 0, lastT = 0;                      // hold: +1 / -1 while an arrow is held; vel: board px per second
+const ease = k => k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+// the next stop ahead (a hair's width, so a stop still counts as ahead until the window is exactly on it)
+const nextStop = dir => dir > 0 ? STOPS.findIndex(st => st.x > cxW + 1e-3)
+                                : STOPS.map(st => st.x < cxW - 1e-3).lastIndexOf(true);
+function go(i) {                                       // glide to stop i (clicker, Home/End, snap scrolling)
+  if (i < 0 || i >= STOPS.length) return;
+  hold = 0; vel = 0;
+  idx = i; target = STOPS[i].x; anim = { from: cxW, to: STOPS[i].x, t0: performance.now(), dur: P.glide * 1000 };
+  cooldown = anim.t0 + anim.dur * 0.6;
+  document.getElementById("hint").style.opacity = 0;
+}
+function camera() {        // keep the window at its set place across the screen, without running past either end of the strip
+  const want = cssW * P.posX - cxW * s, lo = Math.min(0, cssW - W * s), hi = Math.max(0, cssW - W * s) / 2;
+  return Math.min(hi, Math.max(lo, want));
+}
+function travel(dt) {      // hold-to-travel: speed up while held, ease into the next stop and stop there; ease out when released
+  const vmax = P.travel * PANEL / 10, accel = vmax * 4;
+  vel += ((hold * vmax) - vel) * Math.min(1, dt * 6);
+  const dir = Math.sign(vel); if (!dir) return;
+  const ni = nextStop(dir);
+  let step = vel * dt;
+  if (ni >= 0) {
+    const d = Math.abs(STOPS[ni].x - cxW);
+    const cap = Math.sqrt(2 * accel * d) + 8;            // slow down in time to stop exactly on the mark
+    if (Math.abs(vel) > cap) { vel = dir * cap; step = vel * dt; }
+    if (Math.abs(step) >= d) {                          // arrived: stop here; the card shows; a new press carries on
+      cxW = STOPS[ni].x; vel = 0; hold = 0; idx = ni; target = cxW; return;
+    }
+  }
+  cxW = Math.max(0, Math.min(W, cxW + step)); target = cxW;
+  if (cxW === 0 || cxW === W) vel = 0;
+  if (!hold && Math.abs(vel) < 2) vel = 0;
+}
+
+// ---------- the card and the water table (HTML, on top of the canvas) ----------
+const card = document.getElementById("card"), waterEl = document.getElementById("water");
+let shownCard = -1;
+function updateOverlays(moving) {
+  const at = moving ? -1 : STOPS.findIndex(st => Math.abs(st.x - cxW) < 1);
+  if (at !== shownCard) {
+    shownCard = at;
+    if (at >= 0) {
+      const st = STOPS[at];
+      card.querySelector(".kicker").textContent = st.kicker || "";
+      card.querySelector(".title").textContent = st.title || "";
+      card.querySelector(".body").textContent = st.body || "";
+      card.querySelector(".today").textContent = st.today ? "→ Today: " + st.today : "";
+      card.querySelector(".source").textContent = st.source ? "Sources: " + st.source : "";
+      card.classList.add("on");
+    } else card.classList.remove("on");
+  }
+  const w = waterAt(yearAt(cxW));
+  waterEl.querySelector(".num").textContent = w.m.toFixed(1) + " m";
+  waterEl.querySelector(".lab").textContent = "Water below ground · " + w.note;
+}
+
+// ---------- drawing ----------
+function frame(t) {
+  const dt = Math.min(0.05, Math.max(0, (t - (lastT || t)) / 1000)); lastT = t;
+  if (anim) {
+    const k = Math.min(1, (t - anim.t0) / anim.dur);
+    cxW = anim.from + (anim.to - anim.from) * ease(k);
+    if (k >= 1) anim = null;
+    dirty = true;
+  } else if (hold || vel) {
+    travel(dt); dirty = true;
+  } else if (Math.abs(target - cxW) > 0.5) {      // free scrolling: ease towards where the scroll has taken us
+    cxW += (target - cxW) * 0.18; dirty = true;
+  }
+  const moving = !!anim || !!hold || !!vel || Math.abs(target - cxW) > 0.5;
+  const breathing = !moving && P.bAmp > 0 && (P.breathe === "rim" || (P.breathe === "cursor" && mouse));
+  if (!dirty && !breathing) return requestAnimationFrame(frame);
+  if (!dirty && t - lastDraw < 40) return requestAnimationFrame(frame);   // a slow pulse redraws about 25 times a second
+  dirty = false; lastDraw = t;
+  updateOverlays(moving);
+
+  // the window: a circle, or a rectangle of the same height; hh/hw = half height/width, in strip coordinates
+  const ox = Math.round(camera() * dpr) / dpr, rect = P.shape === "rect";   // whole device pixels, so moving dots line up with the still ones
+  const hh = P.size * stripH / 2, hw = rect ? hh * P.aspect : hh, R = hh, cx = cxW * s + ox, cy = stripH / 2 + P.posY * stripH;
+  const sdf = rect      // signed distance from the window's edge (negative inside)
+    ? (x, y) => { const qx = Math.abs(x - cx) - hw, qy = Math.abs(y - cy) - hh; return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0); }
+    : (x, y) => Math.hypot(x - cx, y - cy) - R;
+  const band = hh * Math.max(P.feather, 0.08);   // width of the soft edge, in px
+
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, cv.width, cv.height);
+  for (const tl of tiles) ctx.drawImage(tl.c, Math.round((tl.x0 + ox) * dpr), Math.round(stripTop * dpr));
+  ctx.setTransform(dpr, 0, 0, dpr, 0, stripTop * dpr);   // from here on, y = 0 is the top of the strip
+  const v = { s, ox };
+
+  // one pass redraws every dot that changes (breathe and curtain together, so there are no seams)
+  {
+    const Rb = P.bRadius, osc = breathing ? Math.sin(t * P.bSpeed * 0.002) : 0;
+    const atRim = P.breathe === "rim", mx = mouse ? mouse.x : 0, my = mouse ? mouse.y - stripTop : 0;
+    const smooth = k => k * k * (3 - 2 * k);
+    const fx = (x, y, r) => {
+      const sd = sdf(x, y);
+      if (sd < -band - 2) return 0;               // under the opaque middle of the window: hidden by the photos, so not drawn
+      if (breathing) {
+        const e = atRim ? Math.abs(sd) : Math.hypot(x - mx, y - my);
+        if (e < Rb) r *= 1 + P.bAmp * smooth(1 - e / Rb) * osc;
+      }
+      if (P.part > 0 && sd < 0) { const k = -sd >= band ? 0 : 1 + sd / band; r *= 1 - P.part + P.part * k; }
+      return r;
+    };
+    const m = Math.max(4, P.spacing * 2);
+    let x0 = cx - hw - m, x1 = cx + hw + m, y0 = cy - hh - m, y1 = cy + hh + m;
+    if (breathing && atRim) { x0 -= Rb; x1 += Rb; y0 -= Rb; y1 += Rb; }
+    if (breathing && !atRim) { x0 = Math.min(x0, mx - Rb - m); x1 = Math.max(x1, mx + Rb + m); y0 = Math.min(y0, my - Rb - m); y1 = Math.max(y1, my + Rb + m); }
+    x0 = Math.max(0, x0); x1 = Math.min(cssW, x1); y0 = Math.max(0, y0); y1 = Math.min(stripH, y1);
+    if (x1 > x0 && y1 > y0 && (breathing || P.part > 0)) {
+      ctx.save(); ctx.beginPath(); ctx.rect(x0, y0, x1 - x0, y1 - y0); ctx.clip();
+      ctx.fillStyle = "#fff"; ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+      drawDots(ctx, v, fx, { x0, y0, x1, y1 });
+      ctx.restore();
+    }
+  }
+
+  // the photographs inside the window, as laid out in Figma, fading out towards a soft edge
+  const DW = Math.max(2, Math.ceil(2 * hw * dpr)), DH = Math.max(2, Math.ceil(2 * hh * dpr));
+  if (lens.width !== DW || lens.height !== DH) { lens.width = DW; lens.height = DH; }
+  lctx.globalCompositeOperation = "source-over"; lctx.filter = "none";
+  lctx.fillStyle = "#fff"; lctx.fillRect(0, 0, DW, DH);
+  lctx.drawImage(photoComp, (cx - hw - ox) / s, (cy - hh) / s, 2 * hw / s, 2 * hh / s, 0, 0, DW, DH);
+  lctx.globalCompositeOperation = "destination-in";
+  if (rect) {
+    const f = band * dpr;
+    lctx.filter = `blur(${(f / 2.5).toFixed(1)}px)`;
+    lctx.fillStyle = "#000"; lctx.fillRect(f * 0.6, f * 0.6, DW - f * 1.2, DH - f * 1.2);
+    lctx.filter = "none";
+  } else {
+    const gr = lctx.createRadialGradient(DW / 2, DH / 2, (DW / 2) * (1 - P.feather), DW / 2, DH / 2, DW / 2);
+    gr.addColorStop(0, "rgba(0,0,0,1)"); gr.addColorStop(1, "rgba(0,0,0,0)");
+    lctx.fillStyle = gr; lctx.fillRect(0, 0, DW, DH);
+  }
+  ctx.save(); ctx.beginPath(); ctx.rect(0, 0, cssW, stripH); ctx.clip();
+  ctx.drawImage(lens, cx - hw, cy - hh, 2 * hw, 2 * hh);
+  ctx.restore();
+  if (P.outline === "on") {
+    ctx.beginPath();
+    if (rect) ctx.rect(cx - hw, cy - hh, 2 * hw, 2 * hh); else ctx.arc(cx, cy, R, 0, 6.2832);
+    ctx.strokeStyle = "#c8102e"; ctx.lineWidth = 1; ctx.setLineDash([6, 4]); ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  if (BARE) return requestAnimationFrame(frame);    // ?bare: the collage only (used to export the strip to Figma)
+  // the through line: the whole timeline, with a tick at each decade, a small ring at each stop, and a dot for the window
+  const lx0 = ox, lx1 = ox + W * s;
+  ctx.strokeStyle = "#000"; ctx.lineWidth = Math.max(1, 1.5 * u);
+  ctx.beginPath(); ctx.moveTo(lx0, lineY); ctx.lineTo(lx1, lineY); ctx.stroke();
+  ctx.lineWidth = Math.max(1, u);
+  for (let k = 0; k <= Math.ceil(W / PANEL); k++) {
+    const x = k * PANEL * s + ox; if (x < -10 || x > cssW + 10) continue;
+    ctx.beginPath(); ctx.moveTo(x, lineY - 6 * u); ctx.lineTo(x, lineY + 6 * u); ctx.stroke();
+  }
+  for (const st of STOPS) {
+    const x = st.x * s + ox; if (x < -10 || x > cssW + 10) continue;
+    ctx.beginPath(); ctx.arc(x, lineY, 4 * u, 0, 6.2832); ctx.fillStyle = "#fff"; ctx.fill(); ctx.stroke();
+  }
+  ctx.beginPath(); ctx.arc(cx, lineY, 6.5 * u, 0, 6.2832); ctx.fillStyle = "#000"; ctx.fill();
+  ctx.fillStyle = "#000"; ctx.font = `600 ${32 * u}px Inter, Helvetica, Arial, sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "top";
+  // each stop's years, centred under its ring (from beats.json "label", or the kicker before the "·")
+  STOPS.forEach(st => {
+    const sx = st.x * s + ox; if (sx < -60 || sx > cssW + 60) return;
+    ctx.fillText(st.label || (st.kicker || "").split("·")[0].trim(), sx, lineY + 13 * u);
+  });
+
+  requestAnimationFrame(frame);
+}
+
+// ---------- input ----------
+let acc = 0;
+addEventListener("wheel", e => {
+  if (e.target.closest && e.target.closest("#tune")) return;   // let the tuning panel scroll normally
+  e.preventDefault();
+  if (P.input === "keys") return;
+  const delta = e.deltaY + e.deltaX;
+  if (P.scrollMode === "free") {
+    anim = null; hold = 0; vel = 0;
+    target = Math.max(0, Math.min(W, target + delta * P.freeSpeed / s));
+    document.getElementById("hint").style.opacity = 0; dirty = true;
+    return;
+  }
+  if (anim && performance.now() < cooldown) { acc = 0; return; }
+  acc += delta;
+  if (Math.abs(acc) > P.sens) { const ni = nextStop(Math.sign(acc)); if (ni >= 0) go(ni); acc = 0; }
+}, { passive: false });
+const FWD = ["ArrowRight", "ArrowDown"], BACK = ["ArrowLeft", "ArrowUp"];
+addEventListener("keydown", e => {
+  if (e.key === "t" || e.key === "T") { document.getElementById("tune").classList.toggle("on"); return; }
+  if (e.target.closest && e.target.closest("#tune")) return;   // keys adjust the focused slider, not the window
+  if (FWD.includes(e.key) || BACK.includes(e.key)) {
+    e.preventDefault();
+    if (e.repeat) return;                          // a held key keeps travelling; after a stop, only a new press carries on
+    const last = STOPS[STOPS.length - 1];
+    if (FWD.includes(e.key) && !anim && !vel && Math.abs(cxW - last.x) < 1) {   // at the last stop, one more press: on to the Prover
+      document.body.style.transition = "opacity .45s"; document.body.style.opacity = 0;
+      setTimeout(() => location.href = "../prover/index.html", 450); return;
+    }
+    anim = null; target = cxW; hold = FWD.includes(e.key) ? 1 : -1; dirty = true;
+    document.getElementById("hint").style.opacity = 0;
+  } else if (["PageDown", " "].includes(e.key)) { e.preventDefault(); const ni = nextStop(1); if (ni >= 0) go(ni); }
+  else if (e.key === "PageUp") { e.preventDefault(); const ni = nextStop(-1); if (ni >= 0) go(ni); }
+  else if (e.key === "Home") go(0);
+  else if (e.key === "End") go(STOPS.length - 1);
+});
+addEventListener("keyup", e => {
+  if ((FWD.includes(e.key) && hold > 0) || (BACK.includes(e.key) && hold < 0)) hold = 0;   // let go: ease to a pause
+});
+addEventListener("blur", () => { hold = 0; });
+cv.addEventListener("pointermove", e => { mouse = { x: e.clientX, y: e.clientY }; if (P.breathe === "cursor") dirty = true; });
+cv.addEventListener("pointerleave", () => { mouse = null; });
+addEventListener("resize", () => layout());
+
+// tuning panel
+function buildPanel() {
+  const box = document.getElementById("sliders");
+  SELECTS.forEach(([k, name, opts]) => {
+    const l = document.createElement("label"); l.textContent = name;
+    const sb = document.createElement("select");
+    opts.forEach(([val, txt]) => sb.add(new Option(txt, val)));
+    sb.value = P[k];
+    sb.addEventListener("change", () => { P[k] = sb.value; save(); show(); dirty = true; if (k === "scrollMode") target = cxW; });
+    l.appendChild(sb); box.appendChild(l);
+  });
+  let timer = 0;
+  SLIDERS.forEach(([k, name, mn, mx, st, rebuild]) => {
+    const l = document.createElement("label"); l.textContent = name + " ";
+    const out = document.createElement("span"); out.textContent = P[k];
+    const inp = Object.assign(document.createElement("input"), { type: "range", min: mn, max: mx, step: st, value: P[k] });
+    inp.addEventListener("input", () => {
+      P[k] = +inp.value; out.textContent = inp.value; save(); show(); dirty = true;
+      if (rebuild) { clearTimeout(timer); timer = setTimeout(buildTiles, 200); }
+    });
+    l.append(out, inp); box.appendChild(l);
+  });
+  document.getElementById("reset").onclick = () => { try { localStorage.removeItem("collageTune"); } catch (e) {} location.reload(); };
+  show();
+}
+const show = () => { document.getElementById("vals").textContent = JSON.stringify(P); };
+
+load().then(n => {
+  cxW = target = STOPS[location.hash === "#end" ? STOPS.length - 1 : 0].x; layout();   // #end: coming back from the Prover buildPanel(); requestAnimationFrame(frame);
+  document.getElementById("water").querySelector(".src").textContent = "Median of the belt's CGWB monitoring wells, pre-monsoon";
+  // test hook: the hidden browser pane pauses requestAnimationFrame, so tests step frames by hand
+  window.COLLAGE = { images: n, go, frame: t => { dirty = true; frame(t); },
+                     press: d => { hold = d; }, release: () => { hold = 0; },
+                     state: () => ({ idx, cxW: Math.round(cxW), year: +yearAt(cxW).toFixed(1), vel: Math.round(vel), hold, card: shownCard }) };
+});
+</script>
+</body>
+</html>

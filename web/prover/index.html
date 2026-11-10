@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Feasibility Prover</title>
+<!-- Act 3 of the Review 2 piece: the Feasibility Prover, re-skinned (first pass, 10 Nov night, for Krishna to judge).
+     Brief from the crit: the old screen was too intense, too much text and data at once. The data is already proven, so it
+     becomes an optional layer. On screen now: one question, one bar (this farm's pumping against its safe share), one
+     control (the monsoon crop, paddy to maize), one verdict. Press D (or the button) for the data panel: block choice,
+     farm size and litres, the block's trend, the range across field studies, and what is measured, assumed and not built.
+     The model is unchanged from the Prover v0.2 (water side only): data.js is copied verbatim from
+     A5_Positioning/Storyboard/prover_white.html. The live Prover site is not touched.
+     Keys: → / ← move 10% of the paddy to maize and back (hold to keep going); ← at 100% paddy returns to the collage;
+     D opens or closes the data; Esc closes it. Layout units: px of a 1920 x 1080 screen, like the collage page. -->
+<style>
+  :root { --red:#c8102e; --ink:#000; --grey:#6b6b6b; --pale:#ececec;
+          --u: min(calc(100vw / 1920), calc(100vh / 1080)); --oy: calc((100vh - 1080 * var(--u)) / 2); }
+  html, body { margin:0; height:100%; background:#fff; color:var(--ink); overflow:hidden;
+               font-family: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif; }
+  body { opacity:0; transition:opacity .5s ease; }
+  body.in { opacity:1; }
+  .abs { position:fixed; }
+  /* the card, same place and type as the collage cards */
+  #card { left:calc(30 * var(--u)); top:calc(var(--oy) + 30 * var(--u)); width:calc(900 * var(--u)); }
+  /* the axonometric soil block with the crops (right half) */
+  #axo { left:calc(940 * var(--u)); top:calc(var(--oy) + 150 * var(--u)); width:calc(940 * var(--u)); height:calc(600 * var(--u)); }
+  #axoKey { left:calc(940 * var(--u)); top:calc(var(--oy) + 760 * var(--u)); width:calc(940 * var(--u)); text-align:center;
+            font-size:calc(13 * var(--u)); color:var(--grey); }
+  .kicker { color:var(--red); font-weight:700; font-size:calc(15 * var(--u)); letter-spacing:.1em; text-transform:uppercase; }
+  .title { font-weight:800; font-style:italic; font-size:calc(34 * var(--u)); line-height:1.15; text-transform:uppercase;
+           margin:calc(8 * var(--u)) 0 calc(12 * var(--u)); }
+  .body { font-size:calc(16 * var(--u)); line-height:1.45; max-width:calc(900 * var(--u)); }
+  .source { color:var(--grey); font-size:calc(12 * var(--u)); margin-top:calc(10 * var(--u)); }
+  /* the big number and the bar */
+  #big { left:calc(30 * var(--u)); top:calc(var(--oy) + 250 * var(--u)); }
+  #big .num { font-weight:800; font-size:calc(150 * var(--u)); line-height:.9; color:var(--red); font-variant-numeric:tabular-nums; letter-spacing:-.02em; }
+  #big .cap { font-size:calc(20 * var(--u)); font-weight:600; margin-top:calc(10 * var(--u)); }
+  #bar { left:calc(30 * var(--u)); top:calc(var(--oy) + 812 * var(--u)); width:calc(1860 * var(--u)); height:calc(48 * var(--u)); background:var(--pale); }
+  #bar .safe, #bar .over { position:absolute; top:0; height:100%; }
+  #bar .safe { left:0; background:#000; }
+  #bar .over { background:var(--red); }
+  #bar .limit { position:absolute; top:calc(-14 * var(--u)); bottom:calc(-14 * var(--u)); border-left:calc(2 * var(--u)) dashed #000; }
+  #ticks { left:calc(30 * var(--u)); top:calc(var(--oy) + 872 * var(--u)); width:calc(1860 * var(--u)); height:calc(20 * var(--u)); }
+  #ticks span { position:absolute; transform:translateX(-50%); font-size:calc(13 * var(--u)); color:var(--grey); white-space:nowrap; }
+  #ticks span.lim { color:#000; font-weight:700; }
+  /* the one control */
+  #crop { left:calc(30 * var(--u)); top:calc(var(--oy) + 918 * var(--u)); width:calc(1600 * var(--u)); }
+  #crop .ends { display:flex; justify-content:space-between; font-size:calc(15 * var(--u)); font-weight:700; letter-spacing:.1em; text-transform:uppercase; }
+  #mix { width:100%; margin:calc(10 * var(--u)) 0 0; -webkit-appearance:none; appearance:none; height:calc(4 * var(--u)); background:#000; outline:none; }
+  #mix::-webkit-slider-thumb { -webkit-appearance:none; width:calc(26 * var(--u)); height:calc(26 * var(--u)); border-radius:50%; background:#000; border:calc(4 * var(--u)) solid #fff; box-shadow:0 0 0 calc(1.5 * var(--u)) #000; cursor:grab; }
+  #mix::-moz-range-thumb { width:calc(22 * var(--u)); height:calc(22 * var(--u)); border-radius:50%; background:#000; border:calc(4 * var(--u)) solid #fff; }
+  #crop .read { text-align:center; font-size:calc(16 * var(--u)); margin-top:calc(14 * var(--u)); font-variant-numeric:tabular-nums; }
+  /* the verdict */
+  #verdict { left:calc(30 * var(--u)); top:calc(var(--oy) + 500 * var(--u)); width:calc(840 * var(--u));
+             font-size:calc(28 * var(--u)); font-weight:700; line-height:1.25; }
+  #verdict small { display:block; font-size:calc(14 * var(--u)); font-weight:400; color:var(--grey); margin-top:calc(8 * var(--u)); }
+  /* the button that opens the data */
+  #open { right:calc(30 * var(--u)); bottom:calc(var(--oy) + 30 * var(--u)); font:inherit; font-size:calc(13 * var(--u)); font-weight:700;
+          letter-spacing:.1em; text-transform:uppercase; background:#fff; border:calc(1.5 * var(--u)) solid #000;
+          padding:calc(8 * var(--u)) calc(14 * var(--u)); cursor:pointer; }
+  /* the data layer: a panel from the right */
+  #panel { right:0; top:0; height:100vh; width:calc(640 * var(--u)); background:#fff; border-left:calc(1.5 * var(--u)) solid #000;
+           transform:translateX(102%); transition:transform .45s cubic-bezier(.2,.7,.2,1); overflow-y:auto; box-sizing:border-box;
+           padding:calc(30 * var(--u)) calc(36 * var(--u)) calc(60 * var(--u)); z-index:3; }
+  #panel.on { transform:none; }
+  #panel h2 { font-size:calc(15 * var(--u)); letter-spacing:.1em; text-transform:uppercase; color:var(--red); margin:calc(28 * var(--u)) 0 calc(10 * var(--u)); }
+  #panel h2:first-of-type { margin-top:calc(6 * var(--u)); }
+  #panel p, #panel li { font-size:calc(14 * var(--u)); line-height:1.5; margin:0 0 calc(8 * var(--u)); }
+  #panel .lbl { font-weight:700; }
+  #panel .close { position:absolute; right:calc(24 * var(--u)); top:calc(22 * var(--u)); font:inherit; font-size:calc(13 * var(--u)); background:none; border:none; cursor:pointer; text-decoration:underline; }
+  #map { width:100%; height:auto; display:block; }
+  #map path { stroke:#fff; stroke-width:2; cursor:pointer; }
+  #map text { font-size:15px; text-anchor:middle; pointer-events:none; font-weight:600; }
+  .row { display:flex; justify-content:space-between; font-size:calc(14 * var(--u)); padding:calc(6 * var(--u)) 0; border-bottom:1px solid var(--pale); }
+  .row b { font-variant-numeric:tabular-nums; }
+  #land { width:100%; accent-color:#000; }
+  #trend { width:100%; height:calc(140 * var(--u)); display:block; }
+</style>
+</head>
+<body>
+<div id="card" class="abs">
+  <div class="kicker" id="kicker">Today · one farm</div>
+  <div class="title">How much paddy would have to go?</div>
+  <div class="body">One hypothetical farm takes its block's share of groundwater. Today it grows paddy in the monsoon and wheat in winter. Move its monsoon crop from paddy to maize, and watch what it pumps against what the ground can give back.</div>
+  <div class="source">Central Ground Water Board assessment 2025–26; irrigation measured in field studies in Punjab and Haryana. Press D, or open the data, to see how it is worked out.</div>
+</div>
+
+<canvas id="axo" class="abs" aria-label="The farm as a block of soil: 100 plants, paddy or maize"></canvas>
+<div id="axoKey" class="abs">Each plant is 1% of the farm</div>
+<div id="big" class="abs"><div class="num" id="num">390%</div><div class="cap" id="cap">of its safe share of groundwater, pumped every year</div></div>
+<div id="bar" class="abs"><div class="safe" id="safe"></div><div class="over" id="over"></div><div class="limit" id="limit"></div></div>
+<div id="ticks" class="abs"></div>
+
+<div id="crop" class="abs">
+  <div class="ends"><span>Paddy</span><span>Maize</span></div>
+  <input id="mix" type="range" min="0" max="100" step="1" value="0" aria-label="Share of the monsoon paddy switched to maize">
+  <div class="read" id="read">Monsoon crop: 100% paddy</div>
+</div>
+
+<div id="verdict" class="abs"></div>
+<button id="open" class="abs">The data (D)</button>
+
+<aside id="panel" class="abs" aria-label="The data behind the Prover">
+  <button class="close" id="close">Close (D)</button>
+  <h2>The block</h2>
+  <p>Sangrur and Barnala, by groundwater assessment unit. Tap a block to move the farm there. Darker grey = pumped further beyond its safe limit; black = the farm's block.</p>
+  <svg id="map" viewBox="-6 -6 612 655"></svg>
+  <p id="blockLine"></p>
+
+  <h2>The farm</h2>
+  <p><span class="lbl">Land:</span> <span id="landV">5 acres</span>. Changes the litres, not the percentage: the farm's safe share grows with its area.</p>
+  <input id="land" type="range" min="1" max="25" step="1" value="5" aria-label="Farm size in acres">
+  <div class="row"><span>Water it can pump safely, a year</span><b id="fSafe"></b></div>
+  <div class="row"><span>Water it pumps with this crop mix</span><b id="fNow"></b></div>
+  <div class="row"><span>Cut needed to reach the safe limit</span><b id="fCut"></b></div>
+
+  <h2>The block since 2019</h2>
+  <p>Pumping as a share of the safe limit, each assessment year. Dashed line: the limit.</p>
+  <svg id="trend" viewBox="0 0 640 150" preserveAspectRatio="none"></svg>
+
+  <h2>If every paddy field switched</h2>
+  <p id="rangeLine"></p>
+
+  <h2>Measured</h2>
+  <p>Safe limit, pumping, trend and block outlines: Central Ground Water Board assessment, 2019–20 to 2025–26, via the INGRES portal. Outlines simplified.</p>
+  <h2>Measured elsewhere</h2>
+  <p>Irrigation applied, mm a season, low / central / high. Paddy 1,200 / 1,550 / 1,900. Monsoon maize 110 / 250 / 450. Wheat 320 / 400 / 460. Seven paddy and maize readings from research plots in Punjab and Haryana, none in Sangrur or Barnala: Gulati et al. 2022; Jat et al. 2019; Gupta et al. 2023. Maize high figure derived from the PAU guide, not measured.</p>
+  <h2>Assumed</h2>
+  <p>The farm takes an equal share of its block's water by area. Today's pumping reflects paddy then wheat on all of its land. The safe limit is held fixed, though pumping less also means less water seeping back, so the gain from switching is overstated. Canal water is not yet separated.</p>
+  <h2>Not built</h2>
+  <p>Loan, prices, yields, costs, soil and climate. The farmer is hypothetical and declared as such. Next test: once a loan must be repaid, does any crop but paddy cover it?</p>
+</aside>
+
+<script src="data.js"></script>
+<script>
+// ---------- the model: unchanged from the Prover v0.2 ----------
+const ACRE_HA = 0.4047, HAM_M3 = 10000;
+const stageNow = b => b[4] / b[3] * 100;                                  // pumping as % of the safe limit, 2025-26
+const factor = (m, N = NEED) => (m * N.maize + (1 - m) * N.paddy + N.wheat) / (N.paddy + N.wheat);
+const breakEven = (stage, N = NEED) => (N.paddy + N.wheat) * (1 - 100 / stage) / (N.paddy - N.maize);   // share of paddy to switch; > 1 = not reachable
+const $ = id => document.getElementById(id);
+const fmtML = m3 => (m3 / 1000).toFixed(1) + " million litres";
+
+// start in the block pumped furthest beyond its limit
+let sel = BLOCKS.reduce((best, b, i) => stageNow(b) > stageNow(BLOCKS[best]) ? i : best, 0);
+let mix = 0, shown = 0;                                                    // mix: target share switched (0-1); shown: eased value on screen
+
+// ticks under the bar: 0, 100 (the limit), 200, 300, 400
+const SCALE = 400;
+$("ticks").innerHTML = [0, 100, 200, 300, 400].map(v =>
+  `<span class="${v === 100 ? "lim" : ""}" style="left:${v / SCALE * 100}%">${v === 100 ? "safe share (100%)" : v + "%"}</span>`).join("");
+$("limit").style.left = (100 / SCALE * 100) + "%";
+
+function render() {
+  const b = BLOCKS[sel], stage = stageNow(b), v = stage * factor(shown), over = v > 100;
+  // big number and bar
+  $("num").textContent = Math.round(v) + "%";
+  $("num").style.color = over ? "var(--red)" : "#000";
+  $("safe").style.width = (Math.min(v, 100) / SCALE * 100) + "%";
+  $("over").style.left = (100 / SCALE * 100) + "%";
+  $("over").style.width = (Math.max(0, Math.min(v, SCALE) - 100) / SCALE * 100) + "%";
+  $("kicker").textContent = "Today · one farm in " + b[0];
+  const pm = Math.round(shown * 100);
+  if (pm !== axo.count) { axo.count = pm; drawAxo(pm); }        // plants switch one by one as the mix glides
+  $("read").textContent = pm === 0 ? "Monsoon crop: 100% paddy" : pm === 100 ? "Monsoon crop: 100% maize" : `Monsoon crop: ${100 - pm}% paddy, ${pm}% maize`;
+  // verdict
+  const times = (v / 100).toFixed(1), allMaize = stage * factor(1), need = breakEven(stage);
+  let t, small = "";
+  if (pm === 0) {
+    t = `Today a farm in ${b[0]} pumps ${times} times its safe share of groundwater.`;
+    small = need > 1 ? "Move the crop towards maize." : `On the central estimate it reaches its safe share once about ${Math.round(need * 100)}% of its paddy becomes maize.`;
+  } else if (over && pm === 100) {
+    t = `Even with every paddy field switched to maize, it still pumps ${times} times its safe share.`;
+    small = `Central estimate. Across the field studies, all-maize leaves this farm between ${Math.round(stage * factor(1, NEED_BEST))}% and ${Math.round(stage * factor(1, NEED_WORST))}% of its safe share. The crop alone does not close the gap here.`;
+  } else if (over) {
+    t = `With ${pm}% of its paddy switched to maize, it still pumps ${times} times its safe share.`;
+    small = need > 1 ? `On the central estimate, even all-maize would leave it at ${Math.round(allMaize)}%.` : `It reaches its safe share at about ${Math.round(need * 100)}% maize.`;
+  } else {
+    t = `At ${pm}% maize, this farm is within its safe share.`;
+    small = `Central estimate; the field studies give a range (open the data).`;
+  }
+  $("verdict").innerHTML = t + `<small>${small}</small>`;
+  renderPanel(b, stage, v);
+}
+
+// ---------- the farm as an axonometric block of soil: 10 x 10 plants (each 1% of the farm), drawn in the collage's dot screen ----------
+const rice = new Image(), maize = new Image();
+rice.src = "rice.png"; maize.src = "maize.png";                 // the old Prover's cut-outs (Review1_Explore/prototype/assets)
+const ORDER = (() => { let s = 7; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;   // fixed order in which plots switch
+  const a = [...Array(100).keys()]; for (let i = 99; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; })();
+// look of the block (first pass; Krishna to tune): plant height in cells, dot spacing in px, contrast and brightness of the cut-outs
+const AXO_SET = { plant: 1.5, spacing: 2.5, contrast: 1.8, bright: 0.85, pond: 0.86, water: "#7a7a7a" };
+{ const q = new URLSearchParams(location.search); for (const k in AXO_SET) if (q.has(k)) AXO_SET[k] = +q.get(k); }
+const axo = { cv: $("axo"), scene: document.createElement("canvas"), lo: document.createElement("canvas"), count: -1 };
+function drawAxo(count) {
+  const cv = axo.cv, dpr = devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+  if (!W || !H) return;
+  if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+  // 1. the scene, in plain greys
+  const sc = axo.scene; sc.width = W; sc.height = H;
+  const g = sc.getContext("2d");
+  g.fillStyle = "#fff"; g.fillRect(0, 0, W, H);
+  const N = 10, c = Math.min(W * 0.92 / (2 * N * 0.866), H * 0.97 / (N + 2.3 + 2.2));   // cell size: fits plants + top face + soil depth
+  const hx = c * 0.866, hy = c * 0.5, depth = c * 2.2, ox = W / 2, oy = c * 2.3;
+  const P = (i, j) => [ox + (i - j) * hx, oy + (i + j) * hy];
+  const [tx, ty] = P(0, 0), [rx, ry] = P(N, 0), [bx, by] = P(N, N), [lx, ly] = P(0, N);
+  const poly = (pts, fill) => { g.beginPath(); pts.forEach(([x, y], k) => k ? g.lineTo(x, y) : g.moveTo(x, y)); g.closePath(); g.fillStyle = fill; g.fill(); };
+  poly([[lx, ly], [bx, by], [bx, by + depth], [lx, ly + depth]], "#8c8c8c");     // soil, front-left face
+  poly([[bx, by], [rx, ry], [rx, ry + depth], [bx, by + depth]], "#606060");     // soil, front-right face
+  poly([[tx, ty], [rx, ry], [bx, by], [lx, ly]], "#d4d4d4");                     // topsoil
+  const isMaize = new Set(ORDER.slice(0, count));
+  // paddy stands in water: a darker square on each paddy plot; maize plots stay dry topsoil (Krishna, 10 Nov)
+  const inset = (1 - AXO_SET.pond) / 2;
+  for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+    if (isMaize.has(i * N + j)) continue;
+    poly([P(i + inset, j + inset), P(i + 1 - inset, j + inset), P(i + 1 - inset, j + 1 - inset), P(i + inset, j + 1 - inset)], AXO_SET.water);
+  }
+  const cells = []; for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) cells.push([i, j]);
+  cells.sort((a, b) => (a[0] + a[1]) - (b[0] + b[1]));                            // back to front
+  g.filter = `grayscale(1) contrast(${AXO_SET.contrast}) brightness(${AXO_SET.bright})`;   // the cut-outs are pale: darken them so they read in dots
+  for (const [i, j] of cells) {
+    const im = isMaize.has(i * N + j) ? maize : rice; if (!im.naturalWidth) continue;
+    const [x, y] = P(i + 0.5, j + 0.5), h = c * AXO_SET.plant, w = h * im.naturalWidth / im.naturalHeight;
+    g.drawImage(im, x - w / 2, y - h * 0.96, w, h);
+  }
+  g.filter = "none";
+  // 2. the same dot screen as the collage: one dot per 3.5 px cell, size from the cell's darkness
+  const sp = AXO_SET.spacing, cols = Math.round(W / sp), rows = Math.round(H / sp), lo = axo.lo;
+  lo.width = cols; lo.height = rows;
+  const lg = lo.getContext("2d", { willReadFrequently: true });
+  lg.imageSmoothingEnabled = true; lg.imageSmoothingQuality = "high"; lg.drawImage(sc, 0, 0, cols, rows);
+  const d = lg.getImageData(0, 0, cols, rows).data, x = cv.getContext("2d");
+  x.setTransform(dpr, 0, 0, dpr, 0, 0); x.fillStyle = "#fff"; x.fillRect(0, 0, W, H); x.fillStyle = "#000";
+  const gx = W / cols, gy = H / rows, rmax = 0.55 * gx;
+  for (let jj = 0; jj < rows; jj++) {
+    x.beginPath();
+    for (let ii = 0; ii < cols; ii++) {
+      const dk = 1 - d[(jj * cols + ii) * 4] / 255; if (dk < 0.03) continue;
+      const r = rmax * Math.pow(dk, 0.65), px = (ii + 0.5) * gx, py = (jj + 0.5) * gy;
+      x.moveTo(px + r, py); x.arc(px, py, r, 0, 6.2832);
+    }
+    x.fill();
+  }
+}
+rice.onload = maize.onload = () => { axo.count = -1; render(); };
+addEventListener("resize", () => { axo.count = -1; render(); });
+
+// ---------- the data panel ----------
+function shade(st) { const k = Math.min(1, Math.max(0, (st - 100) / 300)); const g = Math.round(225 - k * 180); return `rgb(${g},${g},${g})`; }
+function renderPanel(b, stage, v) {
+  // greys by how far each block is over its limit; the chosen block in black (red stays for overdraft only)
+  let h = BLOCKS.map((bb, i) => `<path d="${SHAPES[i][0]}" fill="${i === sel ? "#000" : shade(stageNow(bb))}" data-i="${i}"><title>${bb[0]}: ${Math.round(stageNow(bb))}%</title></path>`).join("");
+  h += BLOCKS.map((bb, i) => `<text x="${SHAPES[i][1]}" y="${SHAPES[i][2]}" fill="${i === sel || stageNow(bb) > 250 ? "#fff" : "#000"}">${bb[0]}</text>`).join("");
+  $("map").innerHTML = h;
+  document.querySelectorAll("#map path[data-i]").forEach(el => el.onclick = () => { sel = +el.dataset.i; render(); });
+  $("blockLine").innerHTML = `<span class="lbl">${b[0]}</span> (${b[1]}): pumping ${Math.round(stage)}% of its safe limit in 2025–26.`;
+  // the farm in litres
+  const acres = +$("land").value, ha = acres * ACRE_HA;
+  $("landV").textContent = acres + (acres === 1 ? " acre" : " acres");
+  const safeM3 = b[3] * HAM_M3 / b[2] * ha, nowM3 = safeM3 * v / 100;
+  $("fSafe").textContent = fmtML(safeM3);
+  $("fNow").textContent = fmtML(nowM3);
+  $("fCut").textContent = nowM3 > safeM3 ? fmtML(nowM3 - safeM3) + " (" + Math.round((1 - safeM3 / nowM3) * 100) + "%)" : "none";
+  // trend since 2019
+  const W = 640, H = 150, pl = 34, pr = 10, pt = 10, pb = 22, max = 400;
+  const x = i => pl + i * (W - pl - pr) / (YEARS.length - 1), y = val => pt + (1 - Math.min(val, max) / max) * (H - pt - pb);
+  let s = "";
+  [100, 200, 300, 400].forEach(g => { s += `<line x1="${pl}" y1="${y(g)}" x2="${W - pr}" y2="${y(g)}" stroke="${g === 100 ? "#000" : "#e3e3e3"}" stroke-width="1" ${g === 100 ? 'stroke-dasharray="5 4"' : ""}/><text x="${pl - 6}" y="${y(g) + 3}" font-size="10" fill="#6b6b6b" text-anchor="end">${g}%</text>`; });
+  s += `<polyline fill="none" stroke="var(--red)" stroke-width="2.5" points="${b[5].map((val, i) => x(i) + "," + y(val)).join(" ")}"/>`;
+  b[5].forEach((val, i) => { s += `<circle cx="${x(i)}" cy="${y(val)}" r="3.5" fill="var(--red)"/><text x="${x(i)}" y="${H - 6}" font-size="10" fill="#6b6b6b" text-anchor="${i === 0 ? "start" : i === YEARS.length - 1 ? "end" : "middle"}">${YEARS[i]}</text>`; });
+  $("trend").innerHTML = s;
+  // range across the field studies
+  const lo = Math.round(stage * factor(1, NEED_BEST)), mid = Math.round(stage * factor(1)), hi = Math.round(stage * factor(1, NEED_WORST));
+  $("rangeLine").innerHTML = `A farm in ${b[0]} would pump about <span class="lbl">${mid}%</span> of its safe share on the central estimate, and between ${lo}% and ${hi}% across the field studies. The studies measured paddy and maize in Ludhiana, Karnal and Ladhowal, not in this belt.`;
+}
+
+// ---------- motion and input ----------
+function tick() {                                  // ease the bar towards the slider, so key presses glide
+  if (Math.abs(mix - shown) > 0.0005) { shown += (mix - shown) * 0.18; if (Math.abs(mix - shown) < 0.0005) shown = mix; render(); }
+  requestAnimationFrame(tick);
+}
+$("mix").addEventListener("input", e => { mix = +e.target.value / 100; });
+$("land").addEventListener("input", () => render());
+const panel = $("panel");
+const togglePanel = on => panel.classList.toggle("on", on === undefined ? !panel.classList.contains("on") : on);
+$("open").onclick = () => togglePanel(); $("close").onclick = () => togglePanel(false);
+addEventListener("keydown", e => {
+  if (e.target === $("land")) return;
+  if (e.key === "d" || e.key === "D") { togglePanel(); return; }
+  if (e.key === "Escape") { togglePanel(false); return; }
+  if (e.target === $("mix") && !["ArrowRight", "ArrowLeft", "ArrowUp", "ArrowDown"].includes(e.key)) return;
+  const fwd = ["ArrowRight", "ArrowDown", "PageDown", " "].includes(e.key), back = ["ArrowLeft", "ArrowUp", "PageUp"].includes(e.key);
+  if (!fwd && !back) return;
+  e.preventDefault();
+  if (back && mix <= 0 && shown < 0.01 && !e.repeat) {            // back past 100% paddy: return to the end of the collage
+    document.body.classList.remove("in"); setTimeout(() => location.href = "../collage/index.html#end", 450); return;
+  }
+  mix = Math.max(0, Math.min(1, Math.round((mix + (fwd ? 0.1 : -0.1)) * 10) / 10));
+  $("mix").value = Math.round(mix * 100);
+});
+{ const q = new URLSearchParams(location.search);              // ?m=60 sets the crop mix, ?panel opens the data (for stills)
+  if (q.has("m")) { mix = shown = Math.max(0, Math.min(100, +q.get("m"))) / 100; $("mix").value = Math.round(mix * 100); }
+  if (q.has("panel")) { panel.style.transition = "none"; togglePanel(true); } }
+render(); requestAnimationFrame(tick);
+requestAnimationFrame(() => document.body.classList.add("in"));
+window.PROVER = { set: m => { mix = shown = m; $("mix").value = Math.round(m * 100); render(); }, sel: i => { sel = i; render(); }, panel: togglePanel };
+</script>
+</body>
+</html>

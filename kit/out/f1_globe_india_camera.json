@@ -1,0 +1,26 @@
+{
+ "frame": "f1_globe_india",
+ "title": "Globe, India by opacity",
+ "center": [
+  80,
+  22
+ ],
+ "zoom": 2.3,
+ "pitch": 0,
+ "bearing": 0,
+ "padding": {
+  "top": 0,
+  "bottom": 0,
+  "left": 576,
+  "right": 0
+ },
+ "text_panel_px": [
+  0,
+  576
+ ],
+ "size": [
+  1920,
+  1080
+ ],
+ "maplibre": "5.24.0"
+}
