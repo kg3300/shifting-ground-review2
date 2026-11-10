@@ -136,27 +136,31 @@ const LAYERS = {
   drains:  { name: "Drains", hover: p => [p.name || "Unnamed drain", null, "Drain", src.osm] },
 };
 
-// ============ TOUR: 7 steps. Frames 1-4 are Krishna's; 5-7 stay on frame 4's camera so the grain stays exact ============
+// ============ TOUR: 6 steps (Krishna's order, 10 Nov): India -> belt -> Punjab -> Sangrur-Barnala -> wells fall -> red (end).
+// Frames 1-4 are Krishna's; 5-6 stay on frame 4's camera so the grain stays exact. Fact texts are drafts for Krishna to reword.
 const STEPS = [
   { frame: "f1_globe_india", title: "India", on: ["india"],
+    fact: "Nearly half of India's workers (46.1%) work in agriculture.",
+    src: `PLFS Annual Report, July 2023–June 2024 (NSO, 23 Sep 2024), as reported in the press: 46.1%, up from 45.8% the year before. <span class="verify">To verify against the report.</span> A share of workers, not of the population.` },
+  { frame: "f2_belt", title: "The Green Revolution belt", on: ["belt"],
+    fact: "India's breadbasket: Punjab and Haryana supplied about three of every four tonnes of the wheat the government bought in 2024–25.",
+    src: `PIB, wheat procurement RMS 2024–25 as of 24 May 2024, via the press: Punjab 124.26 + Haryana 71.49 of 262.48 lakh tonnes (75%). <span class="verify">To verify at PIB; the final season total may differ.</span>` },
+  { frame: "f3_punjab", title: "Punjab", on: ["area", "district"],
     fact: "Punjab: 50,362 km², about 1.5% of India's land. It gave 124.14 lakh tonnes of rice to the central pool in 2023–24, about a quarter of all the rice the government bought.",
     src: `Area: state profiles (official figure <span class="verify">to verify</span>). Rice: PIB, KMS 2023–24 (Punjab 124.14 LMT; all India at least 489.15 LMT by 24 May 2024, so Punjab's share is at most 25%).` },
-  { frame: "f2_belt", title: "The Green Revolution belt", on: ["belt"],
-    fact: "The two most over-drawn states: Punjab pumps 156.87% of its yearly extractable groundwater, Haryana 135.96%. India overall: 60.47%.",
-    src: `CGWB, National Compilation on Dynamic Ground Water Resources 2024, via RBI Handbook of Statistics on Indian States, Table 107.` },
-  { frame: "f3_punjab", title: "Punjab", on: ["area", "district"], fact: "", src: "" },
   { frame: "f4_blocks", title: "Sangrur and Barnala: 11 blocks", on: ["area", "district", "blocks"],
     fact: "Paddy covers 80.9% of the ground in the 11 blocks (satellite map, 2021). Official crop statistics: 81.9%.",
     src: "Open-SARice-10 (Zenodo 18905953), 2021; DES land-use statistics via India Data Portal. Each dot's area = share of paddy under it." },
+  { frame: "f4_blocks", title: "The water table falls", on: ["area", "district", "blocks", "wells"],
+    fact: "Every monitoring well with enough readings is falling (23 of 23, 2013–22). Barnala: 9.2 m below ground in 1985, 45.2 m in 2023.",
+    src: src.wells + ". These are CGWB monitoring wells, not irrigation tubewells." },
   { frame: "f4_blocks", title: "Over the limit", on: ["area", "district", "overdraft"], labels: "pct",
     fact: "All 11 blocks are over-exploited. Together they pump 268% of the groundwater the ground gives back each year.",
     src: src.cgwb + ". Stage of extraction = yearly extraction ÷ yearly extractable resource." },
-  { frame: "f4_blocks", title: "The water table falls", on: ["area", "district", "blocks", "wells"],
-    fact: "Every monitoring well with enough readings is falling (23 of 23, 2013–22). Barnala: 9.2 m below ground in 1985, 45.2 m in 2023.",
-    src: src.wells + "." },
-  { frame: "f4_blocks", title: "Canal and tubewell", on: ["area", "district", "blocks", "canals"], labels: "towns",
-    fact: "Tubewells water 72% of Sangrur's irrigated land and 52% of Barnala's (2023–24). Canals water the rest.",
-    src: `DES land-use statistics 2023–24, via India Data Portal (Sangrur 183,969 of 255,448 ha; Barnala 64,824 of 123,639 ha). The canal series jumps in 2012–14: <span class="verify">to verify</span>.` },
+  // dropped 10 Nov (Krishna: the wells slide replaces it). Kept here to bring back if wanted:
+  // { frame: "f4_blocks", title: "Canal and tubewell", on: ["area", "district", "blocks", "canals"], labels: "towns",
+  //   fact: "Tubewells water 72% of Sangrur's irrigated land and 52% of Barnala's (2023–24). Canals water the rest.",
+  //   src: `DES land-use statistics 2023–24, via India Data Portal (Sangrur 183,969 of 255,448 ha; Barnala 64,824 of 123,639 ha). The canal series jumps in 2012–14: <span class="verify">to verify</span>.` },
 ];
 // which map layers each switch shows
 const MAPLAYERS = {
