@@ -231,6 +231,10 @@ async function toCollage() {
     const yy = G + (913 - G) * e; ground.setAttribute("y1", yy); ground.setAttribute("y2", yy); ground.setAttribute("stroke-width", W0 + (W1 - W0) * e); });
   location.href = "../collage/index.html?from=section";
 }
+// a click outside the controls = -> and a right click = <-, so every act moves on by mouse as well as by key (Krishna, 11 Nov)
+{ const on = (e, sel) => e.composedPath().some(el => el.matches && el.matches(sel));   // the path as clicked (a map redraw can remove the target)
+  addEventListener("click", e => { if (e.button === 0 && !on(e, "button, input, a, select, label, #tune, #panel, #sMap, #map, #crop")) dispatchEvent(new KeyboardEvent("keydown", { key: "PageDown" })); });
+  addEventListener("contextmenu", e => { if (on(e, "input, #tune")) return; e.preventDefault(); dispatchEvent(new KeyboardEvent("keydown", { key: "PageUp" })); }); }
 </script>
 </body>
 </html>

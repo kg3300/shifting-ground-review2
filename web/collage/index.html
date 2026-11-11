@@ -417,8 +417,14 @@ addEventListener("keydown", e => {
     }
     anim = null; target = cxW; hold = FWD.includes(e.key) ? 1 : -1; dirty = true;
     document.getElementById("hint").style.opacity = 0;
-  } else if (["PageDown", " "].includes(e.key)) { e.preventDefault(); const ni = nextStop(1); if (ni >= 0) go(ni); }
-  else if (e.key === "PageUp") { e.preventDefault(); const ni = nextStop(-1); if (ni >= 0) go(ni); }
+  } else if (["PageDown", " "].includes(e.key)) {           // one stop on (a clicker, or a click); past the last stop, the Prover
+    e.preventDefault(); if (anim || vel) return; const ni = nextStop(1);
+    if (ni >= 0) go(ni); else { document.body.style.transition = "opacity .45s"; document.body.style.opacity = 0; setTimeout(() => location.href = "../prover/index.html", 450); }
+  }
+  else if (e.key === "PageUp") {                                // one stop back; before the first stop, the soil section
+    e.preventDefault(); if (anim || vel) return; const ni = nextStop(-1);
+    if (ni >= 0) go(ni); else { document.body.style.transition = "opacity .45s"; document.body.style.opacity = 0; setTimeout(() => location.href = "../section/index.html", 450); }
+  }
   else if (e.key === "Home") go(0);
   else if (e.key === "End") go(STOPS.length - 1);
 });
@@ -468,6 +474,10 @@ load().then(n => {
                      press: d => { hold = d; }, release: () => { hold = 0; },
                      state: () => ({ idx, cxW: Math.round(cxW), year: +yearAt(cxW).toFixed(1), vel: Math.round(vel), hold, card: shownCard }) };
 });
+// a click outside the controls = -> and a right click = <-, so every act moves on by mouse as well as by key (Krishna, 11 Nov)
+{ const on = (e, sel) => e.composedPath().some(el => el.matches && el.matches(sel));   // the path as clicked (a map redraw can remove the target)
+  addEventListener("click", e => { if (e.button === 0 && !on(e, "button, input, a, select, label, #tune, #panel, #sMap, #map, #crop")) dispatchEvent(new KeyboardEvent("keydown", { key: "PageDown" })); });
+  addEventListener("contextmenu", e => { if (on(e, "input, #tune")) return; e.preventDefault(); dispatchEvent(new KeyboardEvent("keydown", { key: "PageUp" })); }); }
 </script>
 </body>
 </html>

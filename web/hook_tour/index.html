@@ -437,7 +437,7 @@ function render(fly) {
   document.getElementById("src").innerHTML = S.src ? "Source: " + S.src : "";
   document.getElementById("key").innerHTML = S.on.filter(k => LAYERS[k].read).map(k => `<div><b>${LAYERS[k].name}</b>${LAYERS[k].read}</div>`).join("");   // the paddy grain is explained in the legend (Krishna, 11 Nov)
   document.getElementById("dots").innerHTML = STEPS.map((_, i) => `<i class="${i === step ? "on" : ""}" title="Step ${i + 1}" data-i="${i}"></i>`).join("");
-  document.getElementById("prev").disabled = step === 0; document.getElementById("next").disabled = step === STEPS.length - 1;
+  document.getElementById("prev").disabled = step === 0; document.getElementById("next").disabled = false;   // on the last slide, -> flips into the section
   history.replaceState(null, "", "?" + new URLSearchParams({ ...Object.fromEntries(Q), step: step + 1 }));
 }
 const go = i => { if (i < 0 || i >= STEPS.length) return; step = i; render(true); };
@@ -458,19 +458,18 @@ map.on("mouseout", () => pop.remove());
 
 // ============ controls ============
 document.getElementById("prev").onclick = () => go(step - 1);
-document.getElementById("next").onclick = () => go(step + 1);
+// forward: the next slide, or on the last slide the flip into the soil section (button, map click, -> / space / PageDown)
+const forward = () => { if (step === STEPS.length - 1) { if (window.HOOK && !window.FLIPPING) { window.FLIPPING = true; flipToSection(map); } } else go(step + 1); };
+document.getElementById("next").onclick = forward;
+map.on("click", forward);   // a click on the map (not a drag) moves on too
 document.getElementById("dots").onclick = e => { if (e.target.dataset.i) go(+e.target.dataset.i); };
 document.getElementById("home").onclick = () => map.flyTo({ ...camFor(STEPS[step].frame), duration: 1200 });
 document.getElementById("zin").onclick = () => map.zoomIn(); document.getElementById("zout").onclick = () => map.zoomOut();
 addEventListener("keydown", e => {
   if (e.key === "t" || e.key === "T") { if (TUNE) TUNE.toggle(); return; }
   if (e.target.closest && e.target.closest("#tune")) return;     // keys adjust the focused control in the tuning panel
-  if (e.key === "ArrowRight" || e.key === " ") {
-    e.preventDefault();
-    if (step === STEPS.length - 1 && window.HOOK && !window.FLIPPING) { window.FLIPPING = true; flipToSection(map); }
-    else go(step + 1);
-  }
-  if (e.key === "ArrowLeft") go(step - 1);
+  if (e.key === "ArrowRight" || e.key === " " || e.key === "PageDown") { e.preventDefault(); forward(); }   // PageDown/PageUp: presentation clickers
+  if (e.key === "ArrowLeft" || e.key === "PageUp") { e.preventDefault(); go(step - 1); }
   if (e.key === "h" || e.key === "H") document.getElementById("home").click();
   if (e.key === "f" || e.key === "F") toggleFps();
 });
