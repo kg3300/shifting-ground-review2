@@ -37,9 +37,12 @@
   .wnum { color:var(--red); font-size:52px; font-weight:700; font-variant-numeric:tabular-nums; }
   .wlab { color:var(--red); font-size:12px; font-weight:700; text-transform:uppercase; }
   .wsrc { color:var(--grey); font-size:11px; text-transform:uppercase; text-align:right; }
-  .mat { color:#fff; font-size:13px; font-weight:500; font-style:italic; text-transform:uppercase; }
+  .mat { color:#fff; font-size:13px; font-weight:500; font-style:italic; text-transform:uppercase;
+         -webkit-text-stroke:2.5px #000; paint-order:stroke fill; }   /* board export: black stroke 1.25 px outside */
   /* the well labels (SVG, so they are revealed with their wells) */
   #s text { fill:#fff; font-family: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif; text-transform:uppercase; }
+  /* board export (Krishna, 11 Nov): years and well names carry a black stroke 1 px outside (= 2 px stroke painted under the fill) */
+  #s .yr, #s .nm { paint-order:stroke fill; stroke:#000; stroke-width:2px; stroke-linejoin:round; }
   #s .yr { font-size:13px; font-variant-numeric:tabular-nums; }
   #s .nm { font-size:13px; font-weight:700; }
   #s .bk { font-size:12px; }
@@ -126,7 +129,7 @@ let h = "", bands = "";
 LAYERS.forEach(L => {
   const y0 = y(L.from), y1 = y(L.to);
   bands += `<image href="img/board/${L.img}.png" x="${X0}" y="${r(y0)}" width="${X1 - X0}" height="${r(y1 - y0)}" preserveAspectRatio="none"/>`;
-  if (!L.noLine) bands += `<line x1="${X0}" x2="${X1}" y1="${r(y0)}" y2="${r(y0)}" stroke="#fff" stroke-width="1"/>`;
+  if (!L.noLine) bands += `<line x1="${X0}" x2="${X1}" y1="${r(y0)}" y2="${r(y0)}" stroke="#fff" stroke-width="${L.from ? 2 : 1}"/>`;   // board: 2 px between layers
 });
 h += `<defs><clipPath id="wipe"><rect id="wipeR" x="0" y="${G}" width="1920" height="${B - G + 2}" data-h="${B - G + 2}"/></clipPath></defs>
       <g id="gBands" clip-path="url(#wipe)">${bands}</g><g class="fade">`;
