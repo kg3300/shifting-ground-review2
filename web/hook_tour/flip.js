@@ -78,7 +78,7 @@ export async function flipToSection(map, { url = "../section/index.html?from=hoo
       const [x, y] = onPlane(p), xEnd = txc + sx * (p.x - cx), shift = (F.x(p.X) - xEnd) * u;
       dots[i].setAttribute("cx", (x + shift).toFixed(1)); dots[i].setAttribute("cy", y.toFixed(1));
       // white with a dark rim while on the red; black with a white rim (the section's icon) over the last quarter of the turn
-      const k = Math.round(255 * (1 - ease((u - 0.75) / 0.25))), rim = 255 - k;
+      const k = 255, rim = 0;   // Krishna's board (11 Nov): the section's icon is white with a black rim, so it stays that way
       dots[i].setAttribute("r", (lerp(WELL_ICON.r * 1.3, WELL_ICON.r * F.s, u)).toFixed(2));
       dots[i].setAttribute("fill", `rgb(${k},${k},${k})`); dots[i].setAttribute("stroke", `rgb(${rim},${rim},${rim})`);
       dots[i].setAttribute("stroke-width", (WELL_ICON.stroke * lerp(1.3, F.s, u)).toFixed(2)); dots[i].setAttribute("opacity", wa);

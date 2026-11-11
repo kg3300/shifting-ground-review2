@@ -5,68 +5,54 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Soil section</title>
 <link rel="stylesheet" href="../fonts/inter.css">   <!-- Inter, bundled (Krishna, 11 Nov) -->
-<!-- Soil section (10 Nov 2026). Sits between the hook's last slide (red) and the collage. Styled to match the collage and the Prover
-     (Krishna, 10 Nov): same card (red kicker, bold italic uppercase title, body, grey source), Inter/Helvetica, the presentation red
-     #c8102e, the red indicator bottom right. The card wording is a draft for Krishna to rewrite.
-     Drawing: 15 CGWB monitoring wells (build_section_data.py: one per block + the long-run wells) on one line, west to east by
-     longitude (nudged apart where they would touch, order kept); depth 0-60 m. Each well: black to its first reading (hollow red dot),
-     red to its last (solid red dot). Bands: dry, drained since 1985, saturated (the aquifer today), from the belt-median water table.
-     Data (read only): wells_section.json, ../collage/water.json, ../../kit/data/area_outline.geojson. -->
+<!-- Soil section. Sits between the hook's last slide (red) and the collage.
+     LAYOUT AND STYLE: Krishna's Figma board (file KJYIdATJ25L9HI84gAYZGR, 11 Nov 2026): positions, type, colours and the eight
+     band images (img/board/, Krishna's greyscale edits of the ISRIC photos) are taken from the board; every text is placed at the
+     board's frame coordinates. The well labels are hand-placed on the board, so they are listed per well below (LAB).
+     DATA (read only, unchanged): wells_section.json, ../collage/water.json, ../../kit/data/area_outline.geojson. Wells, dots, the
+     water tables and the band depths are drawn from the data; they match the board to within about 1 px. -->
 <style>
-  :root { --red:#c8102e; --ink:#000; --grey:#6b6b6b; --pale:#ececec;
-          --u: min(calc(100vw / 1920), calc(100vh / 1080)); --oy: calc((100vh - 1080 * var(--u)) / 2); }
+  :root { --red:#c8102e; --ink:#000; --grey:#6b6b6b; }
   html, body { margin:0; height:100%; background:#fff; color:var(--ink); overflow:hidden;
                font-family: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif; }
   body { opacity:0; transition:opacity .5s ease; }   /* fades in and out between acts, as the Prover */
   body.in { opacity:1; }
-  /* intro (from the hook's flip): card, indicator, labels and key fade in last */
-  #card, #water, #s .fade { transition:opacity .6s ease; }
-  body.intro:not(.show) #card, body.intro:not(.show) #water, body.intro:not(.show) #s .fade { opacity:0; }
   #s { position:fixed; inset:0; width:100vw; height:100vh; display:block; overflow:visible; }
-  /* outro (Krishna, 11 Nov): -> plays the build backwards; card, indicator, labels and key fade first */
-  body.outro #card, body.outro #water, body.outro #s .fade, body.outro #icons { opacity:0; transition:opacity .5s ease; }
-  /* the card, same place and type as the collage and Prover cards */
-  #card { position:fixed; left:calc(30 * var(--u)); top:calc(var(--oy) + 30 * var(--u)); width:calc(1000 * var(--u)); }
-  .kicker { color:var(--red); font-weight:700; font-size:calc(15 * var(--u)); letter-spacing:.1em; text-transform:uppercase; }
-  .title { font-weight:800; font-style:italic; font-size:calc(34 * var(--u)); line-height:1.15; text-transform:uppercase;
-           margin:calc(8 * var(--u)) 0 calc(12 * var(--u)); }
-  .body { font-size:calc(16 * var(--u)); line-height:1.45; }
-  .source { color:var(--grey); font-size:calc(12 * var(--u)); margin-top:calc(10 * var(--u)); line-height:1.4; }
-  /* the water table, bottom right, as in the collage */
-  #water { position:fixed; right:calc(30 * var(--u)); bottom:calc(var(--oy) + 30 * var(--u)); text-align:right; color:var(--red); }
-  #water .num { font-weight:800; font-size:calc(52 * var(--u)); line-height:1; font-variant-numeric:tabular-nums; }
-  #water .lab { font-size:calc(12 * var(--u)); font-weight:700; letter-spacing:.06em; text-transform:uppercase; margin-top:calc(4 * var(--u)); }
-  #water .src { color:var(--grey); font-size:calc(11 * var(--u)); margin-top:calc(2 * var(--u)); }
-  /* the drawing (SVG in 1920 x 1080 px, scaled and centred like --u / --oy) */
-  #s text { fill:var(--ink); font-family: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif; }
-  #s .ax { font-size:13px; fill:var(--grey); }
+  /* the text layer: a 1920 x 1080 frame scaled and centred like the SVG, so every text sits at its board position */
+  #f { position:fixed; left:0; top:0; width:1920px; height:1080px; transform-origin:0 0; pointer-events:none; }
+  #f > div { position:absolute; line-height:normal; white-space:nowrap; }
+  #f .wrap { white-space:normal; }
+  /* intro (from the hook's flip): card, indicator, labels and key fade in last; outro: they fade first */
+  .fade { transition:opacity .6s ease; }
+  body.intro:not(.show) .fade { opacity:0; }
+  body.outro .fade, body.outro #icons { opacity:0; transition:opacity .5s ease; }
+  /* board type */
+  .up { text-transform:uppercase; }
+  .r13 { font-size:13px; } .b13 { font-size:13px; font-weight:700; } .b15 { font-size:15px; font-weight:700; }
+  .g { color:var(--grey); }
+  .kicker { color:var(--red); font-size:15px; font-weight:700; }
+  .title { font-size:34px; font-weight:700; }
+  .body { font-size:16px; text-transform:uppercase; }
+  .source { color:var(--grey); font-size:12px; }
+  .wnum { color:var(--red); font-size:52px; font-weight:700; font-variant-numeric:tabular-nums; }
+  .wlab { color:var(--red); font-size:12px; font-weight:700; text-transform:uppercase; }
+  .wsrc { color:var(--grey); font-size:11px; text-transform:uppercase; text-align:right; }
+  .mat { color:#fff; font-size:13px; font-weight:500; font-style:italic; text-transform:uppercase; }
+  /* the well labels (SVG, so they are revealed with their wells) */
+  #s text { fill:#fff; font-family: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif; text-transform:uppercase; }
   #s .yr { font-size:13px; font-variant-numeric:tabular-nums; }
   #s .nm { font-size:13px; font-weight:700; }
-  #s .bk { font-size:12px; fill:var(--grey); }
-  #s .lab { font-size:13px; }
-  #s .zone { font-size:15px; font-weight:700; letter-spacing:.1em; }
-  #s .key { font-size:13px; fill:var(--grey); }
-  /* white halo on well labels, so they read where they fall on the soil photo */
-  #s .yr, #s .nm, #s .bk, #s .mat { paint-order:stroke; stroke:#fff; stroke-width:3.5px; stroke-linejoin:round; }
-  #s .mat { font-size:13px; font-style:italic; fill:#000; }
+  #s .bk { font-size:12px; }
 </style>
 </head>
 <body>
 <svg id="s" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg"></svg>
-
-<div id="card">
-  <div class="kicker">Under the 11 blocks · west to east</div>
-  <div class="title">From 6 m to 40 m below ground</div>
-  <div class="body">Fifteen monitoring wells, at least one in every block, drawn on one line. Each drops to its first reading, then in red to its last. Below the water table the ground is full of water, and its sand layers are the aquifer. Above it lies the ground the pumps have drained.</div>
-  <div class="source">CGWB monitoring wells via India Data Portal; pre-monsoon depth to water. Water table = belt median, 3-year rolling (1985: 3 wells; 2023: 14). Wells chosen by rule: the longest record in each block, plus wells read for 18+ years. Layers: CGWB aquifer mapping, Barnala and Sangrur districts (simplified).</div>
-</div>
-
-<div id="water"><div class="num" id="wnum">40.0 m</div><div class="lab">Water below ground · 2023</div><div class="src">Median of the belt's CGWB monitoring wells, pre-monsoon</div></div>
+<div id="f"></div>
 
 <script type="module">
 import { SECTION, wellXs, WELL_ICON, frameToScreen } from "./geometry.js";
 const { X0, X1, G } = SECTION;            // shared with the hook's flip (hook_tour/flip.js), so its outline lands on this ground line
-const PX_PER_M = 9.5, MAXD = 60, PUMP = 9, RX = 1530;
+const MAXD = 60, PX_PER_M = 659 / MAXD, PUMP = 9;   // board: 0-60 m over 659 px
 // ?from=hook: arrived from the hook's flip. Start from the bare ground line (where the flip left it) and build the section:
 // the layers wipe down, the wells drop in west to east, then the card, labels and key fade in (Krishna, 10 Nov).
 const INTRO = new URLSearchParams(location.search).get("from") === "hook";
@@ -74,119 +60,133 @@ if (INTRO) {
   document.body.style.transition = "none"; document.body.classList.add("in", "intro");
   document.getElementById("s").innerHTML = `<line x1="${X0}" x2="${X1}" y1="${G}" y2="${G}" stroke="#000" stroke-width="${SECTION.GROUND_W}"/>`;
 }
-const RED = "#c8102e", GREY = "#6b6b6b";
+const RED = "#c8102e";
 const get = async u => (await fetch(u)).json();
 const [sec, water, area] = await Promise.all([get("wells_section.json"), get("../collage/water.json"), get("../../kit/data/area_outline.geojson")]);
 const g = area.features[0].geometry, ring = g.type === "Polygon" ? g.coordinates.flat() : g.coordinates.flat(2);
 const W = Math.min(...ring.map(p => p[0])), E = Math.max(...ring.map(p => p[0]));
-const x = lon => X0 + (lon - W) / (E - W) * (X1 - X0), y = m => G + m * PX_PER_M, r = v => Math.round(v * 10) / 10;
+const y = m => G + m * PX_PER_M, r = v => Math.round(v * 10) / 10;
 const yr = Object.fromEntries(water.years.map(d => [d.y, d]));
 const t85 = yr[1985], t23 = yr[2023], B = y(MAXD);
-document.getElementById("wnum").textContent = t23.m.toFixed(1) + " m";
+const base = (top, size) => r(top + 0.969 * size);   // board text boxes give the top; SVG text needs the baseline (Inter ascent)
 
-let h = "";
-// bands: drained since 1985 (lightest); saturated today = photo 1 (Krishna, 10 Nov): a real cut soil face (US National Archives,
-// public domain; img/soil_nara_286175.jpg, cropped from img_src/), scaled to the band's height and repeated across, every other copy
-// mirrored so the seams don't show; a white wash keeps the wells and labels readable. Illustrative: it is not this site's ground.
-// Layers (textures: Krishna's picks S3, A2, C2, K1, ISRIC monoliths, CC BY-SA 3.0; crop_soil.py). ORDER AND DEPTHS after CGWB's
-// lithological cross-sections (Aquifer Mapping reports, Barnala and Sangrur districts, archived copies in Data_Verification/
-// 14_lithology), read off the figures' depth axes: Barnala Tajoke-Barnala (about +-2 m) and Sangrur B-B' (about +-7 m) agree on
-// clay at the surface to ~8 m, sand ~8-38 m, clay ~38-49 m (Sangrur to ~57), sand below. Simplified; the sections are interpolated
-// models from a few boreholes. Kankar: "often intercepts" the sand (report text) but no depth is given, so its band is schematic.
-// Each texture is tiled at one scale (TH px tall), every other copy mirrored. Wash: paler above the 2023 water table (dry), less below.
-const TEX = { silt: { src: "img/layer_silt_PE-005.jpg", w: 600, h: 745 }, sand: { src: "img/layer_sand_BR-020.jpg", w: 600, h: 700 },
-              clay: { src: "img/layer_clay_IT-011.jpg", w: 600, h: 683 }, kankar: { src: "img/layer_kankar_IN-011.jpg", w: 600, h: 745 },
-              nara: { src: "img/soil_nara_286175.jpg", w: 592, h: 800 } };
-const TH = 230, DRY_WASH = 0.5, WET_WASH = 0.35;
+// ---------- the text layer, at the board's frame coordinates ----------
+const T = (x, top, cls, txt, extra = "") => `<div class="${cls}" style="left:${x}px;top:${top}px;${extra}">${txt}</div>`;
+const R = (right, top, cls, txt) => `<div class="${cls}" style="right:${1920 - right}px;top:${top}px">${txt}</div>`;
+let f = "";
+// layers (board: Medium Italic 13, white, uppercase; top of each label as an offset from the top of its layer)
+// ORDER AND DEPTHS after CGWB's lithological cross-sections (Aquifer Mapping reports, Barnala and Sangrur; Data_Verification/
+// 14_lithology), simplified. Kankar "often intercepts" the sand (report text) but no depth is given: its band is schematic.
 const LAYERS = [
-  { from: 0,   to: 1.5, tex: "silt",   label: "Topsoil: loamy sand" },
-  { from: 1.5, to: 8,   tex: "clay",   label: "Sandy clay" },
-  { from: 8,   to: 20,  tex: "sand",   label: "Fine to medium sand: the upper aquifer" },
-  { from: 20,  to: 22,  tex: "kankar", label: "Kankar (lime nodules), depth schematic" },
-  { from: 22,  to: 38,  tex: "sand",   label: "" },
-  { from: 38,  to: 49,  tex: "clay",   label: "Clay" },
-  { from: 49,  to: MAXD, tex: "sand",  label: "Sand: the aquifer below the clay" },
+  { from: 0,   to: 1.5, img: "soil-01-silt-dry",   label: "Topsoil: loamy sand", ly: 0 },
+  { from: 1.5, to: 8,   img: "soil-02-clay-dry",   label: "Sandy clay", ly: 24.5 },
+  { from: 8,   to: 20,  img: "soil-03-sand-dry",   label: "Fine to medium sand: the upper aquifer", ly: 55 },
+  { from: 20,  to: 22,  img: "soil-04-kankar-dry", label: "Kankar (lime nodules)", ly: 0.3 },
+  { from: 22,  to: 38,  img: "soil-05-sand-dry",   label: "" },
+  { from: 38,  to: t23.m, img: "soil-06-clay-dry", label: "Clay", ly: 1.6 },
+  { from: t23.m, to: 49, img: "soil-07-clay-wet",  label: "", noLine: true },   // the 2023 water table splits the clay (no white line)
+  { from: 49,  to: MAXD, img: "soil-08-sand-wet",  label: "Sand: the aquifer below the clay", ly: 50 },
 ];
-// split any layer the 2023 water table cuts through, so the part below it gets the wet wash
-const PARTS = LAYERS.flatMap(L => L.from < t23.m && L.to > t23.m
-  ? [{ ...L, to: t23.m }, { ...L, from: t23.m, label: "" }] : [L]);
-let defs = "", bands = "";
-PARTS.forEach((L, i) => {
-  const T = TEX[L.tex], y0 = y(L.from), y1 = y(L.to), th = L.fit ? y1 - y0 : TH, tw = th * T.w / T.h, wet = L.from >= t23.m;
-  defs += `<pattern id="tex${i}" patternUnits="userSpaceOnUse" x="${X0}" y="${y0}" width="${2 * tw}" height="${th}">
-      <image href="${T.src}" x="0" y="0" width="${tw}" height="${th}" preserveAspectRatio="none"/>
-      <image href="${T.src}" x="0" y="0" width="${tw}" height="${th}" preserveAspectRatio="none" transform="translate(${2 * tw} 0) scale(-1 1)"/></pattern>`;
-  bands += `<rect x="${X0}" y="${y0}" width="${X1 - X0}" height="${y1 - y0}" fill="url(#tex${i})"/>
-      <rect x="${X0}" y="${y0}" width="${X1 - X0}" height="${y1 - y0}" fill="#fff" fill-opacity="${wet ? WET_WASH : DRY_WASH}"/>
-      <line x1="${X0}" x2="${X1}" y1="${y0}" y2="${y0}" stroke="#fff" stroke-width="1"/>`;
-  if (L.label) bands += `<text x="${X0 + 8}" y="${(y0 + y1) / 2 + 4}" class="mat">${L.label}</text>`;
-});
-h += `<defs>${defs}<clipPath id="wipe"><rect id="wipeR" x="0" y="${G}" width="1920" height="${B - G + 12}" data-h="${B - G + 12}"/></clipPath></defs>
-      <g id="gBands" clip-path="url(#wipe)">${bands}</g><g id="gInfo" class="fade">`;
+LAYERS.forEach(L => { if (L.label) f += T(112, r(y(L.from) + L.ly), "mat fade", L.label); });
 // depth axis
-for (let m = 0; m <= MAXD; m += 10) h += `<line x1="${X0 - 22}" x2="${X0 - 14}" y1="${y(m)}" y2="${y(m)}" stroke="#000"/><text x="${X0 - 30}" y="${y(m) + 4.5}" class="ax" text-anchor="end">${m} m</text>`;
-h += `<line x1="${X0 - 18}" x2="${X0 - 18}" y1="${G}" y2="${B}" stroke="#000"/>`;
-// pump limit, water tables
-h += `<line x1="${X0}" x2="${X1}" y1="${y(PUMP)}" y2="${y(PUMP)}" stroke="#000" stroke-dasharray="2 4"/>
-      <text x="${RX}" y="${y(PUMP) + 4.5}" class="lab">≈ 8–10 m: surface pumps stop lifting water</text>
-      <line x1="${X0}" x2="${X1}" y1="${y(t85.m)}" y2="${y(t85.m)}" stroke="#000" stroke-dasharray="8 6"/>
-      <text x="${RX}" y="${y(t85.m) - 6}" class="lab">Water table 1985: ${t85.m} m</text>
-      <line x1="${X0}" x2="${X1}" y1="${y(t23.m)}" y2="${y(t23.m)}" stroke="#000" stroke-width="2"/>
-      <text x="${RX}" y="${y(t23.m) + 4.5}" class="lab"><tspan font-weight="700">Water table 2023: ${t23.m} m</tspan></text>`;
-// zone labels
-const zy1 = (y(t85.m) + y(t23.m)) / 2, zy2 = (y(t23.m) + B) / 2;
-h += `<text x="${RX}" y="${zy1}" class="zone">DRAINED SINCE 1985</text><text x="${RX}" y="${zy1 + 20}" class="lab">${r(t23.m - t85.m)} m of ground that was full of water,</text>
-      <text x="${RX}" y="${zy1 + 38}" class="lab">most of the upper sand aquifer</text>
-      <text x="${RX}" y="${zy2}" class="zone">SATURATED</text><text x="${RX}" y="${zy2 + 20}" class="lab">clay holds water but gives little;</text>
-      <text x="${RX}" y="${zy2 + 38}" class="lab">the sand below it is the aquifer</text></g>`;
-// the 15 wells
+for (let m = 0; m <= MAXD; m += 10) f += R(72, r(y(m) - 9), "r13 g up fade", `${m} m`);
+f += T(102, 35, "r13 g up fade", `West · ${W.toFixed(2)}° E`) + R(1665, 35, "r13 g up fade", `East · ${E.toFixed(2)}° E`);
+// right-hand labels
+f += T(1685, 106, "r13 up fade", `Water table 1985: ${t85.m} m`)
+   + T(1685, 153, "r13 up fade wrap", "≈ 8–10 m: surface pumps stop lifting water", "width:197px")
+   + T(1688, 298, "b15 up fade", "Drained since 1985")
+   + T(1688, 324, "r13 up fade wrap", `${r(t23.m - t85.m)} m of ground that was full of water, most of the upper sand aquifer`, "width:194px")
+   + T(1685, 492, "b13 up fade", `Water table 2023: ${t23.m} m`)
+   + T(1688, 565, "b15 up fade", "Saturated")
+   + T(1688, 584, "r13 up fade wrap", "clay holds water but gives little; the sand below it is the aquifer", "width:194px")
+   + T(1688, 662, "r13 up fade wrap", "The aquifer continues below:", "width:206px")
+   + T(1688, 692, "r13 g up fade wrap", "CGWB's deepest wells here reach about 300 m", "width:194px");
+// the card, bottom left (board: line breaks as Krishna set them)
+f += T(104, 771, "kicker fade", "UNDER THE 11 BLOCKS · WEST TO EAST")
+   + T(104, 793.3, "title fade", "FROM 6 M TO 40 M BELOW GROUND")
+   + T(104, 849.5, "body fade", "Fifteen monitoring wells, at least one in every block, drawn on one line. Each drops to its first reading, then in red to its last. Below the water")
+   + T(104, 872.6, "body fade", "table the ground is full of water, and its sand layers are the aquifer. Above it lies the ground the pumps have drained.")
+   + T(104, 903.2, "source fade", "CGWB monitoring wells via India Data Portal; pre-monsoon depth to water. Water table = belt median, 3-year rolling (1985: 3 wells; 2023: 14). Wells chosen by rule: the longest record in")
+   + T(104, 920, "source fade", "each block, plus wells read for 18+ years. Layers: CGWB aquifer mapping, Barnala and Sangrur districts (simplified).");
+// the water table, bottom right
+f += T(1699.3, 966.1, "wnum fade", `${t23.m.toFixed(1)} m`)
+   + T(1687.5, 1022.1, "wlab fade", "Water below ground · 2023")
+   + T(1605.1, 1037, "wsrc fade wrap", "Median of the belt's CGWB monitoring wells, pre-monsoon", "width:268px");
+// key text
+f += T(101.5, 999.5, "r13 g up fade", "First reading") + T(101.5, 1021.5, "r13 g up fade", "Last reading. Red = how far the water fell at that well");
+const frame = document.getElementById("f"); frame.innerHTML = f;
+const place = () => { const F = frameToScreen(); frame.style.transform = `translate(${F.x(0)}px, ${F.y(0)}px) scale(${F.s})`; };
+place(); addEventListener("resize", place);
+
+// ---------- the drawing ----------
+let h = "", bands = "";
+LAYERS.forEach(L => {
+  const y0 = y(L.from), y1 = y(L.to);
+  bands += `<image href="img/board/${L.img}.png" x="${X0}" y="${r(y0)}" width="${X1 - X0}" height="${r(y1 - y0)}" preserveAspectRatio="none"/>`;
+  if (!L.noLine) bands += `<line x1="${X0}" x2="${X1}" y1="${r(y0)}" y2="${r(y0)}" stroke="#fff" stroke-width="1"/>`;
+});
+h += `<defs><clipPath id="wipe"><rect id="wipeR" x="0" y="${G}" width="1920" height="${B - G + 2}" data-h="${B - G + 2}"/></clipPath></defs>
+      <g id="gBands" clip-path="url(#wipe)">${bands}</g><g class="fade">`;
+// depth axis: ticks and the vertical line (board: x 78-88, line at 82.5)
+for (let m = 0; m <= MAXD; m += 10) h += `<line x1="78" x2="88" y1="${r(y(m))}" y2="${r(y(m))}" stroke="#000"/>`;
+h += `<line x1="82.5" x2="82.5" y1="${G}" y2="${r(B)}" stroke="#000"/>`;
+// pump limit (dotted), 1985 water table (dashed black), 2023 water table (dashed white, 2 px)
+h += `<line x1="${X0}" x2="${X1}" y1="${r(y(PUMP))}" y2="${r(y(PUMP))}" stroke="#000" stroke-dasharray="2 4"/>
+      <line x1="${X0}" x2="${X1}" y1="${r(y(t85.m))}" y2="${r(y(t85.m))}" stroke="#000" stroke-dasharray="8 6"/>
+      <line x1="${X0}" x2="${X1}" y1="${r(y(t23.m))}" y2="${r(y(t23.m))}" stroke="#fff" stroke-width="2" stroke-dasharray="4 4"/></g>`;
+// the 15 wells. Labels hand-placed on Krishna's board, in frame px, west to east (the same order as wells_section.json):
+// name [text, centre x, top], block [text or null, centre x, top], first year [x, top], last year [x, top].
+const LAB = [
+  [["Tappa", 321, 533], ["Sehna", 320.5, 549], [332, 181], [330, 510]],
+  [["Barnala", 523.5, 573], null, [532, 155], [530, 550]],
+  [["Mahal Kalan", 594.5, 504], null, [602, 345], [602, 478]],
+  [["Dhanaula", 664.5, 305], ["Barnala", 664.5, 321], [676, 121], [673, 279]],
+  [["Badbar", 764, 288], ["Barnala", 763, 304], [773, 100], [772, 266]],
+  [["Bugra", 833.5, 504], ["Sangrur", 834, 520], [845, 157], [843, 481]],
+  [["Ghanauri Kalan", 905, 555], ["Sher Pur", 906, 587], [914, 473], [914, 532]],
+  [["Chural Kalan", 976.5, 451], ["Lehra Gaga", 978, 485], [987, 121], [984, 428]],
+  [["Sunam", 1047, 524], ["Sunam", 1046.5, 540], [1056, 438], [1056, 502]],
+  [["Haryao", 1118, 360], ["Andana", 1117.5, 376], [1126, 114], [1126, 337]],
+  [["Bhojowali", 1189, 557], ["Dhuri", 1189, 573], [1197, 379], [1197, 535]],
+  [["Kheri Naran", 1259.5, 487], ["Dirba", 1261, 503], [1268, 438], [1268, 464]],
+  [["Mandevi", 1331, 505], ["Andana", 1330.5, 521], [1342, 149], [1339, 476]],
+  [["Akbar Pur", 1402.5, 383], ["Bhawanigarh", 1403, 399], [1412, 184], [1412, 362]],
+  [["Bhulan", 1475, 187], ["Andana", 1474.5, 203], [1485, 101], [1482, 166]],
+];
 const XS = wellXs(sec.wells, W, E), ws = sec.wells.map((w, i) => ({ ...w, X: XS[i] }));   // shared with the flip
-const icons = ws.map(w => `<circle cx="${r(w.X)}" cy="${G}" r="${WELL_ICON.r}" fill="#000" stroke="#fff" stroke-width="${WELL_ICON.stroke}"/>`).join("");
-const nameOf = w => w.name.replace(/-\s*P[Zz].*$/, "").replace(/ M$/, "").trim();
-ws.forEach((w, i) => { w.NY = y(w.d1) + 24; const p = ws[i - 1]; if (p && w.X - p.X < 90 && Math.abs(w.NY - p.NY) < 34) w.NY = p.NY + 34; });
+const icons = ws.map(w => `<circle cx="${r(w.X)}" cy="${G}" r="${WELL_ICON.r}" fill="#fff" stroke="#000" stroke-width="${WELL_ICON.stroke}"/>`).join("");
 let wellClips = "";
 ws.forEach((w, i) => {
-  const xx = r(w.X), ya = r(y(w.d0)), yb = r(y(w.d1)), full = r(w.NY + 22 - G + 4);   // each well is revealed by a clip that grows down
+  const [nm, bk, a, b] = LAB[i], xx = r(w.X), ya = r(y(w.d0)), yb = r(y(w.d1));
+  const low = Math.max(yb + 8, nm[2] + 17, bk ? bk[2] + 16 : 0), full = r(low - G + 4);   // each well is revealed by a clip that grows down
   wellClips += `<clipPath id="wc${i}"><rect class="wcr" x="${xx - 90}" y="${G - 1}" width="180" height="${full}" data-h="${full}"/></clipPath>`;
   h += `<g class="well" clip-path="url(#wc${i})"><title>${w.name} (${w.block}): ${w.d0} m in ${w.y0}, ${w.d1} m in ${w.y1} (${w.n} pre-monsoon readings)</title>
-        <line x1="${xx}" x2="${xx}" y1="${G}" y2="${ya}" stroke="#000" stroke-width="2"/>
-        <line x1="${xx}" x2="${xx}" y1="${ya}" y2="${yb}" stroke="${RED}" stroke-width="3"/>
+        <line x1="${xx}" x2="${xx}" y1="${G}" y2="${ya}" stroke="#fff" stroke-width="5"/>
+        <line x1="${xx}" x2="${xx}" y1="${ya}" y2="${yb}" stroke="${RED}" stroke-width="5"/>
         <circle cx="${xx}" cy="${ya}" r="5.5" fill="#fff" stroke="${RED}" stroke-width="2"/>
-        <circle cx="${xx}" cy="${yb}" r="5.5" fill="${RED}"/>
-        <text x="${xx + 9}" y="${ya + 4.5}" class="yr">${w.y0}</text>
-        <text x="${xx + 9}" y="${yb + 4.5}" class="yr">${w.y1}</text>
-        <text x="${xx}" y="${r(w.NY)}" class="nm" text-anchor="middle">${nameOf(w)}</text>
-        <text x="${xx}" y="${r(w.NY + 15)}" class="bk" text-anchor="middle">${w.block}</text></g>`;
+        <circle cx="${xx}" cy="${yb}" r="6.5" fill="${RED}"/>
+        <text x="${a[0]}" y="${base(a[1], 13)}" class="yr">${w.y0}</text>
+        <text x="${b[0]}" y="${base(b[1], 13)}" class="yr">${w.y1}</text>
+        <text x="${nm[1]}" y="${base(nm[2], 13)}" class="nm" text-anchor="middle">${nm[0]}</text>
+        ${bk ? `<text x="${bk[1]}" y="${base(bk[2], 12)}" class="bk" text-anchor="middle">${bk[0]}</text>` : ""}</g>`;
 });
 h += `<defs>${wellClips}</defs>`;
-// ground line, ends, break at 60 m
-let zig = `M ${X0} ${B}`; for (let xx = X0, k = 0; xx < X1; xx += 24, k++) zig += ` L ${Math.min(xx + 12, X1)} ${B + (k % 2 ? -6 : 6)} L ${Math.min(xx + 24, X1)} ${B}`;
+// ground line (and its stub to the axis), well icons, key
 h += `<line id="ground" x1="${X0}" x2="${X1}" y1="${G}" y2="${G}" stroke="#000" stroke-width="${SECTION.GROUND_W}"/><g id="icons">${icons}</g>
-      <g id="gInfo2" class="fade"><line x1="${X0 - 18}" x2="${X0}" y1="${G}" y2="${G}" stroke="#000" stroke-width="${SECTION.GROUND_W}"/>
-      <text x="${X0}" y="${G - 12}" class="ax">WEST · ${W.toFixed(2)}° E</text><text x="${X1}" y="${G - 12}" class="ax" text-anchor="end">EAST · ${E.toFixed(2)}° E</text>
-      <path d="${zig}" fill="none" stroke="#000" stroke-width="1.5"/>
-      <text x="${RX}" y="${B - 4}" class="lab">The aquifer continues below:</text><text x="${RX}" y="${B + 14}" class="key">CGWB's deepest wells here reach about 300 m</text></g>`;
-// key, bottom left
-const ky = 968;
-h += `<g id="gKey" class="fade"><line x1="38" x2="38" y1="${ky}" y2="${ky + 20}" stroke="#000" stroke-width="2"/><line x1="38" x2="38" y1="${ky + 20}" y2="${ky + 42}" stroke="${RED}" stroke-width="3"/>
-      <circle cx="38" cy="${ky + 20}" r="5.5" fill="#fff" stroke="${RED}" stroke-width="2"/><circle cx="38" cy="${ky + 42}" r="5.5" fill="${RED}"/>
-      <text x="56" y="${ky + 24.5}" class="key">First reading</text><text x="56" y="${ky + 46.5}" class="key">Last reading. Red = how far the water fell at that well</text>
-      <text x="520" y="${ky + 24.5}" class="key">Wells first read in 2013–18 start deep because the water was already deep there, not because their blocks fell less.</text>
-      <text x="520" y="${ky + 46.5}" class="key">Position = longitude, west to east; close wells nudged apart (order kept). Excluded: one Sehna well with an impossible first reading (100.0 m).</text>
-      <text x="520" y="${ky + 68.5}" class="key">Layers after CGWB's lithological cross-sections, Barnala and Sangrur aquifer mapping reports (simplified; kankar depth schematic). Textures: photographs of real soils, not this site's.</text>
-      <text x="520" y="${ky + 90.5}" class="key">Photos: ISRIC World Soil Reference Collection PE-005, BR-020, IT-011, IN-011 (CC BY-SA 3.0).</text></g>`;
+      <g class="fade"><line x1="82" x2="${X0}" y1="${G}" y2="${G}" stroke="#000" stroke-width="${SECTION.GROUND_W}"/>
+      <line x1="83.5" x2="83.5" y1="988" y2="1008" stroke="#000" stroke-width="2"/><line x1="83.5" x2="83.5" y1="1008" y2="1030" stroke="${RED}" stroke-width="3"/>
+      <circle cx="83.5" cy="1008" r="4.5" fill="#fff" stroke="${RED}" stroke-width="2"/><circle cx="83.5" cy="1030" r="5.5" fill="${RED}"/></g>`;
 
 const svg = document.getElementById("s");
 const ease = t => t < 0 ? 0 : t > 1 ? 1 : t * t * (3 - 2 * t);
-const tween = (ms, f) => new Promise(done => { const t0 = performance.now();
-  const k = now => { const t = Math.min(1, (now - t0) / ms); f(ease(t)); if (t < 1) requestAnimationFrame(k); else done(); }; requestAnimationFrame(k); });
+const tween = (ms, fn) => new Promise(done => { const t0 = performance.now();
+  const k = now => { const t = Math.min(1, (now - t0) / ms); fn(ease(t)); if (t < 1) requestAnimationFrame(k); else done(); }; requestAnimationFrame(k); });
 if (INTRO) {
   // the well icons arrived with the flip: show them on the line straight away
   svg.innerHTML = `<line x1="${X0}" x2="${X1}" y1="${G}" y2="${G}" stroke="#000" stroke-width="${SECTION.GROUND_W}"/>${icons}`;
-  // load the textures before the build starts, so the wipe shows soil, not blanks (at most 1.5 s)
-  const srcs = [...new Set(PARTS.map(L => TEX[L.tex].src))];
-  await Promise.race([Promise.all(srcs.map(s => { const im = new Image(); im.src = s; return im.decode().catch(() => {}); })),
-                      new Promise(r => setTimeout(r, 1500))]);
+  // load the band images before the build starts, so the wipe shows soil, not blanks (at most 1.5 s)
+  await Promise.race([Promise.all(LAYERS.map(L => { const im = new Image(); im.src = `img/board/${L.img}.png`; return im.decode().catch(() => {}); })),
+                      new Promise(res => setTimeout(res, 1500))]);
   svg.innerHTML = h;
   const wipe = svg.querySelector("#wipeR"), rects = [...svg.querySelectorAll(".wcr")];
   [wipe, ...rects].forEach(el => el.setAttribute("height", 0));
@@ -199,7 +199,7 @@ if (INTRO) {
   requestAnimationFrame(() => document.body.classList.add("in"));
 }
 document.title = "Soil section";
-// → (or PageDown / Space) fades into the collage, as the collage's last → fades into the Prover; ← goes back to the hook's last slide
+// → (or PageDown / Space) runs the outro into the collage; ← goes back to the hook's last slide
 let leaving = false;
 addEventListener("keydown", e => {
   const next = ["ArrowRight", "PageDown", " "].includes(e.key), back = ["ArrowLeft", "PageUp"].includes(e.key);
@@ -219,9 +219,9 @@ async function toCollage() {
   await Promise.all(rects.map((el, i) => new Promise(res => setTimeout(() => {
     const h0 = +el.getAttribute("height"); tween(500, e => el.setAttribute("height", h0 * (1 - e))).then(res); }, i * 70))));
   if (wipe) { const h0 = +wipe.getAttribute("height"); await tween(1100, e => wipe.setAttribute("height", h0 * (1 - e))); }
-  const F = frameToScreen(), L = -F.x(0) / F.s - 4, R = (innerWidth - F.x(0)) / F.s + 4;   // the screen's edges, in frame px
-  const W0 = SECTION.GROUND_W, W1 = Math.max(1 / F.s, 1.5);                                // the collage line: max(1 px, 1.5 frame px)
-  await tween(1300, e => { ground.setAttribute("x1", X0 + (L - X0) * e); ground.setAttribute("x2", X1 + (R - X1) * e);
+  const F = frameToScreen(), L = -F.x(0) / F.s - 4, Rr = (innerWidth - F.x(0)) / F.s + 4;   // the screen's edges, in frame px
+  const W0 = SECTION.GROUND_W, W1 = Math.max(1 / F.s, 1.5);                                 // the collage line: max(1 px, 1.5 frame px)
+  await tween(1300, e => { ground.setAttribute("x1", X0 + (L - X0) * e); ground.setAttribute("x2", X1 + (Rr - X1) * e);
     const yy = G + (913 - G) * e; ground.setAttribute("y1", yy); ground.setAttribute("y2", yy); ground.setAttribute("stroke-width", W0 + (W1 - W0) * e); });
   location.href = "../collage/index.html?from=section";
 }
