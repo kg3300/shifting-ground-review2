@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Shifting Ground Hook</title>
-<!-- The hook, act 1 of the Review 2 presentation: a guided tour (7 steps) with hover on everything.
+<!-- The hook, act 1 of the Review 2 presentation: a guided tour (6 steps) with hover on everything; on step 6, -> flips into the soil section.
      STRUCTURE ONLY. Every colour, line weight, marker and panel style here is a PLACEHOLDER copied from the ranking used by
      Drought Interfaces (notes/drought_interfaces_study.md). Krishna's Figma styles replace them: see STYLE below.
      Text: fact lines and sources only; Krishna writes the sentences ("[Your text]").
      Base: Drought Interfaces' treatment (Krishna's choice, 8 Nov, "A"). ?base=neg shows the rejected inverted version.
      Grain: drawn live and exact at any zoom (live_grain.js) from web/tiles/paddy_share (render_share_tiles.py).
      ?offline    -> satellite tiles from web/tiles/eox (cache_tiles.py);  ?step=5 -> open at step 5.
-     Keys: <- -> step, H home (back to the step's view), B switch base. -->
+     Keys: <- -> (or space) step, H home (back to the step's view), T tuning panel, F frame-rate readout. -->
 <link rel="stylesheet" href="../vendor/maplibre-gl-5.24.0/maplibre-gl.css">
 <script src="../vendor/maplibre-gl-5.24.0/maplibre-gl.js"></script>
 <style>
@@ -83,7 +83,7 @@ const FIG_URL = Q.get("styles") || "../../design/figma/hook/styles.json";
 let FIG = null;
 let BASE = Q.get("base") === "neg" ? "neg" : "di";
 const OFFLINE = Q.has("offline");
-const KIT = "../../kit/", D = "data/";
+const KIT = "../../kit/", D = "data/", DV = "?v=20261111a";   // DV: bump when data/*.geojson changes, so browsers reload them
 const FW = 1920, FH = 1080, PANEL = 576;     // the frames were composed at 1920 x 1080 with a 576 px text panel on the left
 
 // ============ STYLE: every value here is a placeholder, to be replaced by Krishna's Figma line styles ============
@@ -93,12 +93,12 @@ const WATER = "#1D4C65";           // DI rivers and aqueducts
 // the overdraft ramp (Krishna, 10 Nov: a gradient by stage of extraction): light red at 100% (the limit), the template red mid-way,
 // dark red at 390% (Sunam, the highest). Placeholder stops for Krishna to set.
 const RED_RAMP = { lo: "#FFB0B0", hi: "#7A0000", from: 100, to: 390 };
-const RED = "#E00000";
+const RED = "#E00000";             // red = overdraft only. Krishna, 8 Nov: the template red (as in the A5 storyboard builds; to verify against the deck)
 // slide 5 (Krishna, 10 Nov): the wells in the same red ramp, by how fast the water falls (2013-22 rate x 10 = m a decade; data 1.3 to 18.9)
 const WELL_RAMP = { from: 0, to: 20 };
 const rampColour = (v, a, b) => { const t = Math.max(0, Math.min(1, (v - a) / (b - a))), h = x => [1, 3, 5].map(i => parseInt(x.slice(i, i + 2), 16));
   const [p, q, u] = t < 0.5 ? [h(RED_RAMP.lo), h(RED), t * 2] : [h(RED), h(RED_RAMP.hi), t * 2 - 1];
-  return "rgb(" + p.map((c, i) => Math.round(c + (q[i] - c) * u)).join(",") + ")"; };             // red = overdraft only. Krishna, 8 Nov: the template red (as in the A5 storyboard builds; to verify against the deck)
+  return "rgb(" + p.map((c, i) => Math.round(c + (q[i] - c) * u)).join(",") + ")"; };
 const GREEN = "#3f8f45";           // paddy dots. Krishna, 8 Nov: deep paddy green
 const STYLE = {
   ground: "hsl(222, 56%, 4%)",
@@ -138,13 +138,6 @@ const LAYERS = {
              hover: p => [p.station_name, `${p.block} block`, `Water ${p.last_depth_m} m below ground (${month(p.last_date)})`,
                           p.slope_m_per_yr != null ? `Falling ${p.slope_m_per_yr} m a year, about ${Math.round(p.slope_m_per_yr * 10)} m a decade (2013–22 trend, ${p.n} readings)` : `Too few readings for a trend (${p.n})`,
                           "Monitoring well", src.wells] },
-  wellsLong: { name: "Long-record wells",
-             hover: p => [p.name, `${p.well_type}, ${p.well_depth_m} m deep · ${p.block} block`,
-                          `<b>${p.first_depth_m} m</b> below ground in ${p.first_year} → <b>${p.last_depth_m} m</b> in ${p.last_year}`,
-                          `Falling ${p.slope_m_per_yr} m a year (${p.n_years} years of readings)`,
-                          p.last_depth_m > p.well_depth_m + 0.01 ? `<span class="warn">Reading deeper than the recorded well depth: to verify</span>`
-                            : Math.abs(p.last_depth_m - p.well_depth_m) < 0.01 ? `<span class="warn">Last reading equals the well's depth: probably dry (to verify)</span>` : null,
-                          "Long-record well", "CGWB manual readings, via India Data Portal"] },
   canals:  { name: "Canals and drains", read: "Dashed: canals (long dash) and drains (short dash). Where canal water reaches, and where it doesn't.",
              hover: p => [p.name || "Unnamed canal", null, "Canal", src.osm] },
   drains:  { name: "Drains", hover: p => [p.name || "Unnamed drain", null, "Drain", src.osm] },
@@ -172,19 +165,19 @@ const STEPS = [
     fact: "All 11 blocks are over-exploited. Together they pump 268% of the groundwater the ground gives back each year.",
     src: src.cgwb + ". Stage of extraction = yearly extraction ÷ yearly extractable resource." },
   // dropped 10 Nov (Krishna: the wells slide replaces it). Kept here to bring back if wanted:
-  // { frame: "f4_blocks", title: "Canal and tubewell", on: ["area", "district", "blocks", "canals"], labels: "towns",
+  // { frame: "f4_blocks", title: "Canal and tubewell", on: ["area", "district", "blocks", "canals"],
   //   fact: "Tubewells water 72% of Sangrur's irrigated land and 52% of Barnala's (2023–24). Canals water the rest.",
   //   src: `DES land-use statistics 2023–24, via India Data Portal (Sangrur 183,969 of 255,448 ha; Barnala 64,824 of 123,639 ha). The canal series jumps in 2012–14: <span class="verify">to verify</span>.` },
 ];
 // which map layers each switch shows
 const MAPLAYERS = {
   base: ["countries"], india: ["india_dim", "india_line", "india_hit"],
-  belt: ["state_lines", "belt_hatch", "belt_line", "belt_hit", "rivers_ne", "cities"],
+  belt: ["state_lines", "belt_hatch", "belt_line", "belt_hit", "rivers_ne"],
   area: ["state_lines", "punjab_line", "canals_main", "area_hatch_f3", "area_line", "area_hit", "rivers_ne"],
   district: ["district_line", "district_hit"], blocks: ["block_line", "block_hit", "rivers_osm"],
   overdraft: ["block_line", "overdraft_hit", "rivers_osm"],
-  retired: ["wells_long", "wells_l_hit"],   // listed so they stay hidden on every slide (no step turns them on)
-  wells: ["wells_monitoring", "wells_m_hit"],   // Krishna, 10 Nov: only the 23 wells with a 2013-22 trend; the long-record ticks are off canals: ["canals", "drains", "canals_hit", "drains_hit", "rivers_osm"],
+  wells: ["wells_monitoring", "wells_m_hit"],   // Krishna, 10 Nov: only the 23 wells with a 2013-22 trend
+  canals: ["canals", "drains", "canals_hit", "drains_hit", "rivers_osm"],   // no slide uses these since the canal slide was dropped; the T panel can
   context: ["districts_ph", "drains_ph"],   // not on any slide by default: switched on per slide in the tuning panel (T)
 };
 const CITIES = [["Delhi", 77.209, 28.614], ["Chandigarh", 76.779, 30.733], ["Ludhiana", 75.857, 30.901], ["Amritsar", 74.872, 31.634],
@@ -222,7 +215,8 @@ await Promise.all([...new Set(STEPS.map(x => x.frame))].map(async F => { CAM[F] 
 const SHOT = Q.get("shot");
 const SAVE_PORT = Q.get("save") || "8767";   // the kit receiver's port (?save=8768 if 8767 is taken)
 const map = new maplibregl.Map({
-  container: "map", attributionControl: false, maxPitch: 70, ...camFor(STEPS[step].frame),
+  container: "map", attributionControl: false, keyboard: false,   // ← → are the slide keys; the map must not pan on them (Krishna, 11 Nov: map jumped between slides 4-6)
+  maxPitch: 70, ...camFor(STEPS[step].frame),
   ...(EXPORT ? { pixelRatio: 1, canvasContextAttributes: { preserveDrawingBuffer: true } } : {}),
   style: { version: 8, projection: projection(),
     sources: {
@@ -231,13 +225,13 @@ const map = new maplibregl.Map({
       state_lines: { type: "geojson", data: KIT + "data/india_state_lines.geojson" }, punjab: { type: "geojson", data: KIT + "data/punjab.geojson" },
       belt: { type: "geojson", data: KIT + "data/belt_punjab_haryana.geojson" }, rivers_ne: { type: "geojson", data: KIT + "data/rivers.geojson" },
       canals_main: { type: "geojson", data: KIT + "data/canals_main.geojson" }, districts: { type: "geojson", data: KIT + "data/districts_sangrur_barnala.geojson" },
-      area: { type: "geojson", data: KIT + "data/area_outline.geojson" }, blocks: { type: "geojson", data: D + "blocks.geojson" },
-      wells_m: { type: "geojson", data: D + "wells_monitoring.geojson" }, wells_l: { type: "geojson", data: D + "wells_long.geojson" },
-      canals: { type: "geojson", data: D + "canals.geojson" }, drains: { type: "geojson", data: D + "drains.geojson" },
+      area: { type: "geojson", data: KIT + "data/area_outline.geojson" }, blocks: { type: "geojson", data: D + "blocks.geojson" + DV },
+      wells_m: { type: "geojson", data: D + "wells_monitoring.geojson" + DV },
+      canals: { type: "geojson", data: D + "canals.geojson" + DV }, drains: { type: "geojson", data: D + "drains.geojson" + DV },
       rivers_osm: { type: "geojson", data: "../../data/map/osm_rivers.geojson" },
       // outside the belt (Krishna, 10 Nov): district outlines of Punjab + Haryana, geoBoundaries 2021 (Data_Verification/13_hook_context)
-      districts_ph: { type: "geojson", data: D + "districts_ph.geojson" },
-      drains_ph: { type: "geojson", data: D + "drains_ph.geojson" },        // OSM drains across Punjab + Haryana (fetched 10 Nov)
+      districts_ph: { type: "geojson", data: D + "districts_ph.geojson" + DV },
+      drains_ph: { type: "geojson", data: D + "drains_ph.geojson" + DV },        // OSM drains across Punjab + Haryana (fetched 10 Nov)
     },
     layers: [
       // opacity just under 1 keeps the ground in MapLibre's ordered (translucent) pass: an opaque background is drawn first and
@@ -259,23 +253,19 @@ const map = new maplibregl.Map({
       line("india_line", "india", STYLE.state), line("punjab_line", "punjab", STYLE.state), line("belt_line", "belt", STYLE.studyOutline),
       line("block_line", "blocks", STYLE.block), line("district_line", "districts", STYLE.district), line("area_line", "area", STYLE.studyOutline),
       { id: "wells_monitoring", type: "circle", source: "wells_m", filter: ["!=", ["get", "slope_m_per_yr"], null], paint: { "circle-color": "#fff", "circle-radius": 2.5, "circle-opacity": 0 } },   // drawn as the SVG icon instead
-      { id: "wells_long", type: "circle", source: "wells_l", paint: { "circle-color": "#fff", "circle-radius": 3 } },
       { id: "wells_m_hit", type: "circle", source: "wells_m", filter: ["!=", ["get", "slope_m_per_yr"], null], paint: { "circle-radius": 9, "circle-opacity": 0 } },
-      { id: "wells_l_hit", type: "circle", source: "wells_l", paint: { "circle-radius": 9, "circle-opacity": 0 } },
       // invisible hit areas so thin lines and outlines are easy to hover
       hit("india_hit", "india"), hit("belt_hit", "belt"), hit("area_hit", "area"), hit("district_hit", "districts"),
       hit("block_hit", "blocks"), hit("overdraft_hit", "blocks"), hit("canals_hit", "canals", "line"), hit("drains_hit", "drains", "line"),
     ] },
 });
-const ALL = [...new Set(Object.values(MAPLAYERS).flat())].filter(id => id !== "cities");
+const ALL = [...new Set(Object.values(MAPLAYERS).flat())];
 // hover: map layer -> LAYERS entry, in priority order (points first, then lines, then areas)
-const HOVER = [["wells_l_hit", "wellsLong"], ["wells_m_hit", "wells"], ["canals_hit", "canals"], ["drains_hit", "drains"],
+const HOVER = [["wells_m_hit", "wells"], ["canals_hit", "canals"], ["drains_hit", "drains"],
                ["overdraft_hit", "overdraft"], ["block_hit", "blocks"], ["district_hit", "district"], ["area_hit", "area"], ["belt_hit", "belt"], ["india_hit", "india"]];
 
-// ============ wells as down-ticks (Krishna, 8 Nov): a tick hangs from each well; length = depth to water, 1 m = 1 px at frame scale ============
-// Drawn in an SVG over the map and redrawn every frame. Long-record wells: solid to the first reading, dashed on to the latest.
-const TICK = { pxPerM: 1.5, bar: 16, mark: 7, width: 4,   // Krishna, 10 Nov: bigger; tunable in the T panel ("Well icons")
-                longThin: 1.5, dash: "4 3", colour: "#fff", opacity: 0.9 };
+// ============ wells (slide 5): each well as a small section, drawn in an SVG over the map and redrawn every frame ============
+const TICK = { pxPerM: 1.5, bar: 16, mark: 7, width: 4, opacity: 0.9 };   // Krishna, 10 Nov: bigger; tunable in the T panel ("Well icons")
 const ticksSvg = document.getElementById("ticks");
 function drawTicks() {
   // Krishna, 10 Nov: each well as a small section: ground bar, line down to the water table (latest reading), water mark; red by rate of fall
@@ -316,10 +306,8 @@ function setLabels(kind) {
   if (!DATA.blocks) return;   // data not loaded yet (a key pressed during loading)
   const add = (txt, ll, cls) => { const e = document.createElement("div"); e.className = "lbl " + (cls || ""); e.innerHTML = txt;
     labels.push(new maplibregl.Marker({ element: e, anchor: cls === "pct" ? "center" : "left" }).setLngLat(ll).addTo(map)); };
-  if (kind === "cities") CITIES.forEach(([n, lo, la]) => add(n, [lo, la]));
   if (kind === "pct") DATA.blocks.features.forEach(f => add(`${f.properties.block}<br>${Math.round(f.properties.stage_pct)}%`, [f.properties.label_lon, f.properties.label_lat], "pct"));
   if (kind === "blocks") DATA.blocks.features.forEach(f => add(f.properties.block, [f.properties.label_lon, f.properties.label_lat], "pct"));   // Krishna, 10 Nov: names at each block's visual centre
-  if (kind === "towns") DATA.towns.features.forEach(f => add(f.properties.name, f.geometry.coordinates));
 }
 
 function render(fly) {
@@ -328,11 +316,11 @@ function render(fly) {
   for (const id of ALL) map.setLayoutProperty(id, "visibility", want.has(id) ? "visible" : "none");
   // the hatch: the belt in frame 2, the study area in frame 3 (Krishna: same hatch for both); none at block scale
   map.setLayoutProperty("area_hatch_f3", "visibility", S.frame === "f3_punjab" ? "visible" : "none");
-  // place names now come from the tuning panel's places list (per slide); only the block percentages stay here
+  // place names come from the tuning panel's places list (per slide); only the block names and percentages are drawn here
   setLabels(["pct", "blocks"].includes(S.labels) ? S.labels : null);
   setRed(S.on.includes("overdraft") ? 1 : 0);
   if (TUNE) { TUNE.apply(step); TUNE.refresh(); }
-  applyFigmaStyles(FIG, { map, step, s, dz: dz(), TICK, dots, base: new URL(".", new URL(FIG_URL, location.href)).href })
+  if (FIG) applyFigmaStyles(FIG, { map, step, s, dz: dz(), TICK, dots, base: new URL(".", new URL(FIG_URL, location.href)).href })
     .then(() => { if (TUNE) TUNE.apply(step); drawTicks(); });
   drawTicks();
   const c = camFor(S.frame);
@@ -381,9 +369,6 @@ addEventListener("keydown", e => {
   if (e.key === "ArrowLeft") go(step - 1);
   if (e.key === "h" || e.key === "H") document.getElementById("home").click();
   if (e.key === "f" || e.key === "F") toggleFps();
-  if (e.key === "b" || e.key === "B") { BASE = BASE === "di" ? "neg" : "di"; const all = { ...STYLE.sat.di, ...STYLE.sat.neg };
-    for (const k in all) map.setPaintProperty("sat", k, k in STYLE.sat[BASE] ? STYLE.sat[BASE][k] : null);
-    Q.set("base", BASE); history.replaceState(null, "", "?" + Q.toString()); }
 });
 addEventListener("resize", () => { measure(); if (!window.HOOK) return; map.setProjection(projection()); map.jumpTo(camFor(STEPS[step].frame)); });
 
@@ -414,9 +399,10 @@ map.on("load", async () => {
   const grain = dots;   // the export modes wait for grain.op === 1 (always, now)
   if (!Q.has("placeholder")) FIG = await loadFigmaStyles(FIG_URL);
   if (FIG) document.getElementById("placeholder").textContent = "Figma styles: " + FIG.files.length + " files";
-  for (const [k, f] of [["blocks", "blocks"], ["towns", "towns"], ["wellsM", "wells_monitoring"], ["wellsL", "wells_long"], ["places", "places"]]) DATA[k] = await (await fetch(D + f + ".geojson")).json();
-  // tuning panel (T): per-slide lines and places. Defaults reproduce the tour as it was: slide 2 shows the 7 cities, slide 7 the belt towns.
-  const cityNames = new Set(CITIES.map(c => c[0])), townNames = new Set(DATA.towns.features.map(f => f.properties.name));
+  await Promise.all([["blocks", "blocks"], ["wellsM", "wells_monitoring"], ["places", "places"]]
+    .map(async ([k, f]) => { DATA[k] = await (await fetch(D + f + ".geojson" + DV)).json(); }));   // in parallel
+  // tuning panel (T): per-slide lines and places. By default slide 2 shows the 7 cities; Krishna's settings decide the rest.
+  const cityNames = new Set(CITIES.map(c => c[0]));
   TUNE = initTune({ map, steps: STEPS, getStep: () => step, scale: () => s, places: DATA.places,
     icon: { obj: TICK, redraw: drawTicks, fields: [["bar", "Ground bar width", 4, 40, 1, "px"], ["mark", "Water mark ▽ size", 2, 20, 0.5, "px"],
             ["width", "Line weight", 0.5, 10, 0.25, "px"], ["pxPerM", "Depth scale", 0.5, 4, 0.1, "px per m"], ["opacity", "Opacity", 0.2, 1, 0.05, ""]] },
@@ -424,7 +410,7 @@ map.on("load", async () => {
     defaultHatch: (id, st) => id === "belt_hatch" ? STEPS[st].on.includes("belt") : STEPS[st].frame === "f3_punjab",
     defaultMask: (id, st) => (id === "punjab" && st === 2) || (id === "area" && [3, 4, 5].includes(st)),   // Krishna, 10 Nov: outside Punjab dimmed on slide 3, outside Sangrur-Barnala on slides 4-6
     linked: { 4: 3, 5: 3 },   // Krishna, 10 Nov: slides 5 and 6 use slide 4's lines, hatches, mask and places
-    defaultPlaces: (name, st) => (STEPS[st].on.includes("belt") && cityNames.has(name)) || (STEPS[st].labels === "towns" && townNames.has(name)) });
+    defaultPlaces: (name, st) => STEPS[st].on.includes("belt") && cityNames.has(name) });
   // baked defaults: hook_tune.json (Krishna's settings, once sent); ?tunefile=x.json loads another file and always wins (for stills)
   try { const tf = Q.get("tunefile") || "hook_tune.json", base = await fetch(tf);
         if (base.ok && (Q.has("tunefile") || !localStorage.getItem("hookTune"))) TUNE.load(await base.json()); } catch (e) {}
