@@ -17,7 +17,7 @@
   svg { display: block; width: 100vw; height: 100vh; font-family: Arial, Helvetica, sans-serif; }
   text { fill: #000; }
   .small { font-size: 16px; } .zone { font-size: 18px; font-weight: 700; } .kicker { font-size: 18px; letter-spacing: .12em; }
-  .grey { fill: #777; }
+  .grey { fill: #777; } .yr { font-size: 13px; } .nm { font-size: 13px; }
 </style>
 </head>
 <body>
@@ -25,8 +25,8 @@
 <script type="module">
 const X0 = 200, X1 = 1460, G = 230, PX_PER_M = 10, MAXD = 60, PUMP = 9;   // ground line X0-X1 at y = G; 1 m = 10 px; pump limit about 8-10 m
 const get = async u => (await fetch(u)).json();
-const [mon, long, water, area] = await Promise.all([get("../hook_tour/data/wells_monitoring.geojson"), get("../hook_tour/data/wells_long.geojson"),
-                                                    get("../collage/water.json"), get("../../kit/data/area_outline.geojson")]);
+const RED = "#E00000", MINGAP = 62;      // the template red (as the hook); wells closer than MINGAP px are nudged apart, order kept
+const [sec, water, area] = await Promise.all([get("wells_section.json"), get("../collage/water.json"), get("../../kit/data/area_outline.geojson")]);
 const g = area.features[0].geometry, ring = g.type === "Polygon" ? g.coordinates.flat() : g.coordinates.flat(2);
 const W = Math.min(...ring.map(p => p[0])), E = Math.max(...ring.map(p => p[0]));
 const x = lon => X0 + (lon - W) / (E - W) * (X1 - X0), y = m => G + m * PX_PER_M, r = v => Math.round(v * 10) / 10;
@@ -36,7 +36,7 @@ const RX = X1 + 24;                       // right-hand label column
 
 let h = "";
 h += `<text x="60" y="64" class="kicker">SECTION · SANGRUR–BARNALA, WEST TO EAST · 0–60 M</text>
-      <text x="60" y="94" class="small grey">Plain draft. Every monitoring well in the 11 blocks on one line; each drops to its depth to water. Below the water table the ground is saturated: that is the aquifer.</text>`;
+      <text x="60" y="94" class="small grey">Plain draft. 15 monitoring wells, every block, on one line: each drops to its first reading, then (red) to its last. Below the water table the ground is saturated: that is the aquifer.</text>`;
 // bands (light tints only, for Krishna to restyle): drained since 1985, and saturated today down to the break
 h += `<rect x="${X0}" y="${y(t85.m)}" width="${X1 - X0}" height="${y(t23.m) - y(t85.m)}" fill="#000" fill-opacity="0.05"/>
       <rect x="${X0}" y="${y(t23.m)}" width="${X1 - X0}" height="${B - y(t23.m)}" fill="#000" fill-opacity="0.14"/>`;
@@ -56,17 +56,27 @@ h += `<text x="${RX}" y="${(y(t85.m) + y(t23.m)) / 2 + 4}" class="zone">DRAINED 
       <text x="${RX}" y="${(y(t85.m) + y(t23.m)) / 2 + 26}" class="small">${r(t23.m - t85.m)} m of ground that was full of water</text>
       <text x="${RX}" y="${(y(t23.m) + B) / 2 + 4}" class="zone">SATURATED: THE AQUIFER TODAY</text>
       <text x="${RX}" y="${(y(t23.m) + B) / 2 + 26}" class="small">water fills the gaps between grains</text>`;
-// monitoring wells: ground to latest depth
-for (const f of mon.features) {
-  const p = f.properties, xx = r(x(f.geometry.coordinates[0])), d = +p.last_depth_m;
-  h += `<line x1="${xx}" x2="${xx}" y1="${G}" y2="${r(y(d))}" stroke="#000" stroke-width="1.5" stroke-opacity="0.55"><title>${p.station_name} (${p.block}): ${d} m, ${p.last_date.slice(0, 4)}</title></line>`;
-}
-// long-record wells: solid to the first reading, dashed on to the latest (as the hook's ticks)
-for (const f of long.features) {
-  const p = f.properties, xx = r(x(f.geometry.coordinates[0])), a = +p.first_depth_m, b = +p.last_depth_m;
-  h += `<g><title>${p.name} (${p.block}): ${a} m in ${p.first_year}, ${b} m in ${p.last_year}</title>
-        <line x1="${xx}" x2="${xx}" y1="${G}" y2="${r(y(a))}" stroke="#000" stroke-width="4"/>
-        <line x1="${xx}" x2="${xx}" y1="${r(y(a))}" y2="${r(y(b))}" stroke="#000" stroke-width="4" stroke-dasharray="6 5"/></g>`;
+// the 15 wells (one per block + the long-run wells; build_section_data.py): black from the ground to the first reading,
+// red from the first reading (hollow dot) to the last (solid dot); years at the dots, the well's name under the last dot
+const ws = sec.wells.map(w => ({ ...w, X: x(w.lon) }));
+for (let pass = 0; pass < 40; pass++)                    // nudge apart wells closer than MINGAP, keeping west-to-east order
+  for (let i = 1; i < ws.length; i++) { const d = ws[i].X - ws[i - 1].X; if (d < MINGAP) { const k = (MINGAP - d) / 2; ws[i - 1].X -= k; ws[i].X += k; } }
+const nameOf = w => w.name.replace(/-\s*P[Zz].*$/, "").replace(/ M$/, "").trim();
+ws.forEach((w, i) => {                                   // name label under the last dot; drop a row if it would hit its neighbour's
+  w.NY = y(w.d1) + 24; const p = ws[i - 1];
+  if (p && w.X - p.X < 90 && Math.abs(w.NY - p.NY) < 34) w.NY = p.NY + 34;
+});
+for (const w of ws) {
+  const xx = r(w.X), ya = r(y(w.d0)), yb = r(y(w.d1));
+  h += `<g><title>${w.name} (${w.block}): ${w.d0} m in ${w.y0}, ${w.d1} m in ${w.y1} (${w.n} pre-monsoon readings)</title>
+        <line x1="${xx}" x2="${xx}" y1="${G}" y2="${ya}" stroke="#000" stroke-width="2"/>
+        <line x1="${xx}" x2="${xx}" y1="${ya}" y2="${yb}" stroke="${RED}" stroke-width="3"/>
+        <circle cx="${xx}" cy="${ya}" r="5.5" fill="#fff" stroke="${RED}" stroke-width="2"/>
+        <circle cx="${xx}" cy="${yb}" r="5.5" fill="${RED}"/>
+        <text x="${xx + 9}" y="${ya + 5}" class="yr">${w.y0}</text>
+        <text x="${xx + 9}" y="${yb + 5}" class="yr">${w.y1}</text>
+        <text x="${xx}" y="${r(w.NY)}" class="nm" text-anchor="middle">${nameOf(w)}</text>
+        <text x="${xx}" y="${r(w.NY + 16)}" class="nm grey" text-anchor="middle">${w.block}</text></g>`;
 }
 // ground line (on top), its ends, and the break at 60 m: the ground and the aquifer go on below
 let zig = `M ${X0} ${B}`; for (let xx = X0, k = 0; xx < X1; xx += 24, k++) zig += ` L ${Math.min(xx + 12, X1)} ${B + (k % 2 ? -7 : 7)} L ${Math.min(xx + 24, X1)} ${B}`;
@@ -75,13 +85,15 @@ h += `<line id="ground" x1="${X0}" x2="${X1}" y1="${G}" y2="${G}" stroke="#000" 
       <path d="${zig}" fill="none" stroke="#000" stroke-width="1.5"/>
       <text x="${RX}" y="${B + 6}" class="small">The aquifer continues below.</text><text x="${RX}" y="${B + 26}" class="small grey">CGWB's deepest monitoring tubewells</text><text x="${RX}" y="${B + 46}" class="small grey">here reach about 300 m.</text>`;
 // key and source
-const ky = 905;
-h += `<line x1="60" x2="60" y1="${ky}" y2="${ky + 26}" stroke="#000" stroke-width="1.5" stroke-opacity="0.55"/><text x="76" y="${ky + 19}" class="small">Monitoring well (${mon.features.length}): ground to its latest reading, 2013–21</text>
-      <line x1="60" x2="60" y1="${ky + 40}" y2="${ky + 54}" stroke="#000" stroke-width="4"/><line x1="60" x2="60" y1="${ky + 54}" y2="${ky + 68}" stroke="#000" stroke-width="4" stroke-dasharray="6 5"/>
-      <text x="76" y="${ky + 60}" class="small">Long-record well (${long.features.length}): solid to its first reading (1985–2001), dashed to its latest (2010–23)</text>
-      <text x="60" y="1018" class="small grey">Source: CGWB monitoring wells via India Data Portal; pre-monsoon depth to water below ground. Water table = belt median, 3-year rolling, across wells (1985: ${t85.n} wells; 2023: ${t23.n}); in single blocks it lies between about 19 and 45 m.</text>
-      <text x="60" y="1040" class="small grey">Simplified: real alluvium alternates sand (holds and gives water) and clay (slows it); the section shows one saturated zone. Pump limit: physical suction limit, see notes. Deepest monitoring tubewells: Barnala 301.8 m, Chural Kalan 302.5 m (CGWB).</text>
-      <text x="60" y="1062" class="small grey">Horizontal position = longitude only, so wells north and south of each other overlap (e.g. the two Barnala town wells).</text>`;
+const ky = 930;
+h += `<line x1="60" x2="60" y1="${ky}" y2="${ky + 22}" stroke="#000" stroke-width="2"/><line x1="60" x2="60" y1="${ky + 22}" y2="${ky + 46}" stroke="${RED}" stroke-width="3"/>
+      <circle cx="60" cy="${ky + 22}" r="5.5" fill="#fff" stroke="${RED}" stroke-width="2"/><circle cx="60" cy="${ky + 46}" r="5.5" fill="${RED}"/>
+      <text x="78" y="${ky + 27}" class="small">first reading</text><text x="78" y="${ky + 51}" class="small">last reading: red = how far the water fell at that well</text>
+      <text x="560" y="${ky + 27}" class="small">${ws.length} wells: one in each of the 11 blocks (the longest record there) and the other long-run wells (18+ years, 10+ readings).</text>
+      <text x="560" y="${ky + 51}" class="small">Wells first read in 2013–18 start deep because the water was already deep, not because their blocks fell less.</text>
+      <text x="60" y="1018" class="small grey">Source: CGWB monitoring wells via India Data Portal; pre-monsoon depth to water below ground. Water table lines = belt median, 3-year rolling, across wells (1985: ${t85.n} wells; 2023: ${t23.n}).</text>
+      <text x="60" y="1040" class="small grey">Simplified: real alluvium alternates sand (holds and gives water) and clay (slows it); the section shows one saturated zone. Deepest monitoring tubewells: Barnala 301.8 m, Chural Kalan 302.5 m (CGWB).</text>
+      <text x="60" y="1062" class="small grey">Horizontal position = longitude, west to east; wells that would sit closer than ${MINGAP} px are nudged apart so they read (order kept). Excluded: one Sehna well whose first reading (100.0 m) is a recording error.</text>`;
 document.getElementById("s").innerHTML = h;
 document.title = "Soil section";
 </script>
