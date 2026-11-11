@@ -315,7 +315,7 @@ function drawAxo(count) {
   // the cut-outs are pale: greyed and darkened so they read in dots. The filter is applied once per setting and cached
   // (filtering 100 plants on every redraw made the crop slider stutter)
   const fk = `${AXO_SET.contrast}|${AXO_SET.bright}`;
-  if (axo.fk !== fk) { axo.fk = fk; axo.f = [rice, maize].map(im => { if (!im.naturalWidth) return null;
+  if (axo.fk !== fk) { axo.fk = fk; axo.f = [rice, maize].map(im => { if (!im.complete || !im.naturalWidth) return null;   // complete: the size is known before the pixels arrive
     const cc = document.createElement("canvas"); cc.width = im.naturalWidth; cc.height = im.naturalHeight; const cg = cc.getContext("2d");
     cg.filter = `grayscale(1) contrast(${AXO_SET.contrast}) brightness(${AXO_SET.bright})`; cg.drawImage(im, 0, 0); return cc; });
     if (axo.f.includes(null)) axo.fk = null; }
@@ -357,7 +357,7 @@ function drawAxo(count) {
   }
   x.fill(ink); x.fillStyle = AXO_SET.water; x.fill(wet);
 }
-rice.onload = maize.onload = () => { axo.count = -1; render(); };
+rice.onload = maize.onload = () => { axo.fk = null; axo.count = -1; render(); };   // rebuild the greyed cut-outs once the image is in
 addEventListener("resize", () => { axo.count = -1; render(); });
 
 // ---------- the data panel ----------
