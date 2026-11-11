@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Collage timeline</title>
+<link rel="stylesheet" href="../fonts/inter.css">   <!-- Inter, bundled (Krishna, 11 Nov) -->
 <!-- Act 2 of the Review 2 piece: the collage timeline (Krishna's design: sketches and decisions of 9–10 Nov).
      The whole collage is one halftone (overlaps multiplied, square grid, black on white). A window travels along the
      timeline; inside it the dots open onto the photographs as laid out in Figma.
@@ -448,7 +449,8 @@ function buildPanel() {
 const show = () => { document.getElementById("vals").textContent = JSON.stringify(P); };
 
 load().then(n => {
-  cxW = target = STOPS[location.hash === "#end" ? STOPS.length - 1 : 0].x; layout();   // #end: coming back from the Prover buildPanel(); requestAnimationFrame(frame);
+  cxW = target = STOPS[location.hash === "#end" ? STOPS.length - 1 : 0].x; layout(); buildPanel(); requestAnimationFrame(frame);   // #end: coming back from the Prover
+  document.fonts.load(`600 32px Inter`).then(() => { dirty = true; });   // redraw the canvas years once Inter has loaded (Krishna, 11 Nov: one face)
   document.getElementById("water").querySelector(".src").textContent = "Median of the belt's CGWB monitoring wells, pre-monsoon";
   // test hook: the hidden browser pane pauses requestAnimationFrame, so tests step frames by hand
   window.COLLAGE = { images: n, go, frame: t => { dirty = true; frame(t); },

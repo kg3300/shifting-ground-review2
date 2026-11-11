@@ -2,7 +2,7 @@
 
 Krishna Goyal, M.S. Computational Design Practices, Columbia GSAPP, Fall 2026.
 
-Three acts, in order: [hook map](web/hook_tour/index.html) → [collage timeline](web/collage/index.html) → [Feasibility Prover](web/prover/index.html).
+Four acts, in order: [hook map](web/hook_tour/index.html) → [soil section](web/section/index.html) → [collage timeline](web/collage/index.html) → [Feasibility Prover](web/prover/index.html).
 Keys: arrows to move, T for the tuning panel, D for the Prover's data panel.
 
 Built from the coursework folder by `Review2_Prototype/kit/build_site.py`; edit there, not here.
@@ -13,4 +13,5 @@ Built from the coursework folder by `Review2_Prototype/kit/build_site.py`; edit 
 - Groundwater: Central Ground Water Board, via INGRES and the India Data Portal.
 - Lines and places: Natural Earth; © OpenStreetMap contributors (ODbL 1.0); district outlines from geoBoundaries (ODbL 1.0).
 - Map library: MapLibre GL JS 5.24.0 (BSD-3-Clause).
+- Type: Inter (The Inter Project Authors), SIL Open Font License 1.1, bundled from Fontsource (web/fonts/inter/LICENSE).
 - Collage photographs: archive and press images, used for academic critique; sources listed in the collage notes. (To verify: rights, before Review 3.)
