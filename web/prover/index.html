@@ -12,7 +12,8 @@
      farm size and litres, the block's trend, the range across field studies, and what is measured, assumed and not built.
      The model is unchanged from the Prover v0.2 (water side only): data.js is copied verbatim from
      A5_Positioning/Storyboard/prover_white.html. The live Prover site is not touched.
-     Keys: → / ← move 10% of the paddy to maize and back (hold to keep going); ← at 100% paddy returns to the collage;
+     Two parts (Krishna, 11 Nov). Part 1: choose the block (click or up/down) and the farm size; -> starts part 2, the simulator.
+     Keys in part 2: → / ← move 10% of the paddy to maize and back (hold to keep going); ← at 100% paddy returns to part 1;
      D opens or closes the data; Esc closes it. Layout units: px of a 1920 x 1080 screen, like the collage page. -->
 <style>
   :root { --red:#c8102e; --ink:#000; --grey:#6b6b6b; --pale:#ececec;
@@ -77,11 +78,48 @@
   .row b { font-variant-numeric:tabular-nums; }
   #land { width:100%; accent-color:#000; }
   #trend { width:100%; height:calc(140 * var(--u)); display:block; }
+  /* PART 1 (Krishna, 11 Nov): choose the farm (block and size), then the simulator is part 2. Same template as the rest. */
+  #setup { position:fixed; inset:0; background:#fff; z-index:2; transition:opacity .45s ease; }
+  #setup.off { opacity:0; pointer-events:none; }
+  #setup .card { position:absolute; left:calc(30 * var(--u)); top:calc(var(--oy) + 30 * var(--u)); width:calc(900 * var(--u)); }
+  #sMap { position:absolute; left:calc(1010 * var(--u)); top:calc(var(--oy) + 110 * var(--u)); height:calc(860 * var(--u)); width:auto; }
+  #sMap path { stroke:#fff; stroke-width:2; cursor:pointer; transition:fill .25s; }
+  #sMap path:hover { stroke:#000; stroke-width:2.5; }
+  #sMap text { font-family:inherit; text-anchor:middle; pointer-events:none; }
+  #sMap .n { font-size:15px; font-weight:700; } #sMap .v { font-size:14px; font-variant-numeric:tabular-nums; }
+  #sMapKey { position:absolute; left:calc(1010 * var(--u)); top:calc(var(--oy) + 990 * var(--u)); width:calc(820 * var(--u));
+             font-size:calc(13 * var(--u)); color:var(--grey); }
+  #sFarm { position:absolute; left:calc(30 * var(--u)); top:calc(var(--oy) + 330 * var(--u)); width:calc(820 * var(--u)); }
+  #sFarm .lab { font-size:calc(15 * var(--u)); font-weight:700; letter-spacing:.1em; text-transform:uppercase; }
+  #sFarm .num { font-weight:800; font-size:calc(150 * var(--u)); line-height:.9; letter-spacing:-.02em; font-variant-numeric:tabular-nums; margin-top:calc(14 * var(--u)); }
+  #sFarm .num small { font-size:calc(40 * var(--u)); font-weight:700; letter-spacing:0; margin-left:calc(12 * var(--u)); }
+  #sLand { width:100%; margin:calc(26 * var(--u)) 0 calc(8 * var(--u)); -webkit-appearance:none; appearance:none; height:calc(4 * var(--u)); background:#000; outline:none; }
+  #sLand::-webkit-slider-thumb { -webkit-appearance:none; width:calc(26 * var(--u)); height:calc(26 * var(--u)); border-radius:50%; background:#000; border:calc(4 * var(--u)) solid #fff; box-shadow:0 0 0 calc(1.5 * var(--u)) #000; cursor:grab; }
+  #sFarm .ends { display:flex; justify-content:space-between; font-size:calc(13 * var(--u)); color:var(--grey); }
+  #sRead { position:absolute; left:calc(30 * var(--u)); top:calc(var(--oy) + 700 * var(--u)); width:calc(820 * var(--u)); font-size:calc(20 * var(--u)); line-height:1.45; }
+  #sRead b { font-weight:700; } #sRead .red { color:var(--red); font-weight:700; }
+  #sGo { position:absolute; left:calc(30 * var(--u)); top:calc(var(--oy) + 960 * var(--u)); font:inherit; font-size:calc(15 * var(--u)); font-weight:700;
+         letter-spacing:.1em; text-transform:uppercase; background:#000; color:#fff; border:none; padding:calc(14 * var(--u)) calc(22 * var(--u)); cursor:pointer; }
+  #litres { font-size:calc(16 * var(--u)); font-weight:400; color:var(--grey); margin-top:calc(8 * var(--u)); font-variant-numeric:tabular-nums; }
 </style>
 </head>
 <body>
+<section id="setup" aria-label="Part 1: choose the farm">
+  <div class="card">
+    <div class="kicker">Part 1 of 2 · your farm</div>
+    <div class="title">Where is the farm, and how big?</div>
+    <div class="body">Choose a block in Sangrur and Barnala, and the size of the farm. The farm takes its block's share of the groundwater by area; the simulator then asks how much of its paddy would have to go.</div>
+  </div>
+  <div id="sFarm"><div class="lab">Size of the farm</div><div class="num"><span id="sAcres">5</span><small id="sUnit">acres</small></div>
+    <input id="sLand" type="range" min="1" max="25" step="1" value="5" aria-label="Farm size in acres"><div class="ends"><span>1 acre</span><span>25 acres</span></div></div>
+  <div id="sRead"></div>
+  <button id="sGo">Run the simulator →</button>
+  <svg id="sMap" viewBox="-6 -6 612 655" aria-label="The 11 blocks; click one to place the farm"></svg>
+  <div id="sMapKey">The 11 blocks, with the share of their safe limit they pump (CGWB 2025–26). Darker = further over. Black = the farm's block. ↑ ↓ or click to choose.</div>
+</section>
+
 <div id="card" class="abs">
-  <div class="kicker" id="kicker">Today · one farm</div>
+  <div class="kicker" id="kicker">Part 2 of 2 · one farm</div>
   <div class="title">How much paddy would have to go?</div>
   <div class="body">One hypothetical farm takes its block's share of groundwater. Today it grows paddy in the monsoon and wheat in winter. Move its monsoon crop from paddy to maize, and watch what it pumps against what the ground can give back.</div>
   <div class="source">Central Ground Water Board assessment 2025–26; irrigation measured in field studies in Punjab and Haryana. Press D, or open the data, to see how it is worked out.</div>
@@ -89,7 +127,7 @@
 
 <canvas id="axo" class="abs" aria-label="The farm as a block of soil: 100 plants, paddy or maize"></canvas>
 <div id="axoKey" class="abs">Each plant is 1% of the farm</div>
-<div id="big" class="abs"><div class="num" id="num">390%</div><div class="cap" id="cap">of its safe share of groundwater, pumped every year</div></div>
+<div id="big" class="abs"><div class="num" id="num">390%</div><div class="cap" id="cap">of its safe share of groundwater, pumped every year</div><div id="litres"></div></div>
 <div id="bar" class="abs"><div class="safe" id="safe"></div><div class="over" id="over"></div><div class="limit" id="limit"></div></div>
 <div id="ticks" class="abs"></div>
 
@@ -161,7 +199,10 @@ function render() {
   $("safe").style.width = (Math.min(v, 100) / SCALE * 100) + "%";
   $("over").style.left = (100 / SCALE * 100) + "%";
   $("over").style.width = (Math.max(0, Math.min(v, SCALE) - 100) / SCALE * 100) + "%";
-  $("kicker").textContent = "Today · one farm in " + b[0];
+  const acres = +$("land").value, farm = `${acres}-acre farm`;
+  $("kicker").textContent = `Part 2 of 2 · a ${farm} in ${b[0]}`;
+  const safeM3 = b[3] * HAM_M3 / b[2] * acres * ACRE_HA;
+  $("litres").textContent = `About ${(safeM3 * v / 100 / 1e3).toFixed(1)} million litres a year; its safe share is ${(safeM3 / 1e3).toFixed(1)} million.`;
   const pm = Math.round(shown * 100);
   if (pm !== axo.count) { axo.count = pm; drawAxo(pm); }        // plants switch one by one as the mix glides
   $("read").textContent = pm === 0 ? "Monsoon crop: 100% paddy" : pm === 100 ? "Monsoon crop: 100% maize" : `Monsoon crop: ${100 - pm}% paddy, ${pm}% maize`;
@@ -169,7 +210,7 @@ function render() {
   const times = (v / 100).toFixed(1), allMaize = stage * factor(1), need = breakEven(stage);
   let t, small = "";
   if (pm === 0) {
-    t = `Today a farm in ${b[0]} pumps ${times} times its safe share of groundwater.`;
+    t = `Today a ${farm} in ${b[0]} pumps ${times} times its safe share of groundwater.`;
     small = need > 1 ? "Move the crop towards maize." : `On the central estimate it reaches its safe share once about ${Math.round(need * 100)}% of its paddy becomes maize.`;
   } else if (over && pm === 100) {
     t = `Even with every paddy field switched to maize, it still pumps ${times} times its safe share.`;
@@ -183,7 +224,27 @@ function render() {
   }
   $("verdict").innerHTML = t + `<small>${small}</small>`;
   renderPanel(b, stage, v);
+  renderSetup(b, stage);
 }
+
+// ---------- part 1: choose the farm ----------
+function renderSetup(b, stage) {
+  const acres = +$("land").value;
+  $("sAcres").textContent = acres; $("sUnit").textContent = acres === 1 ? "acre" : "acres"; $("sLand").value = acres;
+  let h = BLOCKS.map((bb, i) => `<path d="${SHAPES[i][0]}" fill="${i === sel ? "#000" : shade(stageNow(bb))}" data-i="${i}"><title>${bb[0]}: ${Math.round(stageNow(bb))}%</title></path>`).join("");
+  h += BLOCKS.map((bb, i) => { const light = i === sel || stageNow(bb) > 250 ? "#fff" : "#000";
+    return `<text x="${SHAPES[i][1]}" y="${SHAPES[i][2] - 4}" class="n" fill="${light}">${bb[0]}</text><text x="${SHAPES[i][1]}" y="${SHAPES[i][2] + 14}" class="v" fill="${light}">${Math.round(stageNow(bb))}%</text>`; }).join("");
+  $("sMap").innerHTML = h;
+  document.querySelectorAll("#sMap path[data-i]").forEach(el => el.onclick = () => { sel = +el.dataset.i; render(); });
+  const safeM3 = b[3] * HAM_M3 / b[2] * acres * ACRE_HA;
+  $("sRead").innerHTML = `A <b>${acres}-acre farm in ${b[0]}</b> (${b[1]} district). Its block pumps <span class="red">${Math.round(stage)}%</span> of what the ground gives back each year.`
+    + ` The farm's safe share: about <b>${(safeM3 / 1e3).toFixed(1)} million litres</b> a year. Today, with paddy then wheat, it pumps about <b>${(safeM3 * stage / 100 / 1e3).toFixed(1)} million</b>.`;
+}
+let part = 1;
+function setPart(n) { part = n; $("setup").classList.toggle("off", n === 2); if (n === 2) $("mix").focus({ preventScroll: true }); else document.activeElement?.blur(); }
+$("sLand").addEventListener("input", e => { $("land").value = e.target.value; render(); });
+$("sGo").onclick = () => setPart(2);
+const BY_STAGE = BLOCKS.map((b, i) => i).sort((a, b) => stageNow(BLOCKS[b]) - stageNow(BLOCKS[a]));   // up/down walk the blocks, worst first
 
 // ---------- the farm as an axonometric block of soil: 10 x 10 plants (each 1% of the farm), drawn in the collage's dot screen ----------
 const rice = new Image(), maize = new Image();
@@ -288,24 +349,30 @@ const togglePanel = on => panel.classList.toggle("on", on === undefined ? !panel
 $("open").onclick = () => togglePanel(); $("close").onclick = () => togglePanel(false);
 addEventListener("keydown", e => {
   if (e.target === $("land")) return;
+  if (part === 1) {                                     // part 1: up/down choose the block, -> or Enter starts the simulator, <- back to the collage
+    if (e.target === $("sLand") && ["ArrowLeft", "ArrowRight"].includes(e.key)) return;   // the size slider takes left/right while focused
+    if (["ArrowUp", "ArrowDown"].includes(e.key)) { e.preventDefault(); const k = BY_STAGE.indexOf(sel); sel = BY_STAGE[(k + (e.key === "ArrowDown" ? 1 : -1) + BLOCKS.length) % BLOCKS.length]; render(); return; }
+    if (["ArrowRight", "Enter", " ", "PageDown"].includes(e.key)) { e.preventDefault(); setPart(2); return; }
+    if (["ArrowLeft", "PageUp"].includes(e.key) && !e.repeat) { e.preventDefault(); document.body.classList.remove("in"); setTimeout(() => location.href = "../collage/index.html#end", 450); }
+    return;
+  }
   if (e.key === "d" || e.key === "D") { togglePanel(); return; }
   if (e.key === "Escape") { togglePanel(false); return; }
   if (e.target === $("mix") && !["ArrowRight", "ArrowLeft", "ArrowUp", "ArrowDown"].includes(e.key)) return;
   const fwd = ["ArrowRight", "ArrowDown", "PageDown", " "].includes(e.key), back = ["ArrowLeft", "ArrowUp", "PageUp"].includes(e.key);
   if (!fwd && !back) return;
   e.preventDefault();
-  if (back && mix <= 0 && shown < 0.01 && !e.repeat) {            // back past 100% paddy: return to the end of the collage
-    document.body.classList.remove("in"); setTimeout(() => location.href = "../collage/index.html#end", 450); return;
-  }
+  if (back && mix <= 0 && shown < 0.01 && !e.repeat) { setPart(1); return; }   // back past 100% paddy: part 1, choose the farm
   mix = Math.max(0, Math.min(1, Math.round((mix + (fwd ? 0.1 : -0.1)) * 10) / 10));
   $("mix").value = Math.round(mix * 100);
 });
 { const q = new URLSearchParams(location.search);              // ?m=60 sets the crop mix, ?panel opens the data (for stills)
   if (q.has("m")) { mix = shown = Math.max(0, Math.min(100, +q.get("m"))) / 100; $("mix").value = Math.round(mix * 100); }
-  if (q.has("panel")) { panel.style.transition = "none"; togglePanel(true); } }
+  if (q.has("panel")) { panel.style.transition = "none"; togglePanel(true); }
+  if (q.has("m") || q.get("part") === "2") { $("setup").style.transition = "none"; setPart(2); } }   // ?part=2 opens the simulator directly
 render(); requestAnimationFrame(tick);
 requestAnimationFrame(() => document.body.classList.add("in"));
-window.PROVER = { set: m => { mix = shown = m; $("mix").value = Math.round(m * 100); render(); }, sel: i => { sel = i; render(); }, panel: togglePanel };
+window.PROVER = { part: setPart, set: m => { mix = shown = m; $("mix").value = Math.round(m * 100); render(); }, sel: i => { sel = i; render(); }, panel: togglePanel };
 </script>
 </body>
 </html>
