@@ -105,7 +105,10 @@ import { flipToSection } from "./flip.js";   // last slide, -> : the outline fli
 let TUNE = null;   // the per-slide tuning panel (T), set up once the data is loaded
 const Q = new URLSearchParams(location.search);
 let BASE = Q.get("base") === "neg" ? "neg" : "di";
-const OFFLINE = Q.has("offline");
+// ?offline: satellite tiles from web/tiles/eox. Remembered for the browser session, so coming back from the section stays offline;
+// ?offline=0 switches it off again.
+let OFFLINE = Q.has("offline") ? Q.get("offline") !== "0" : (() => { try { return sessionStorage.getItem("hookOffline") === "1"; } catch (e) { return false; } })();
+try { sessionStorage.setItem("hookOffline", OFFLINE ? "1" : "0"); } catch (e) {}
 const KIT = "../../kit/", D = "data/", DV = "?v=20261111a";   // DV: bump when data/*.geojson changes, so browsers reload them
 const FW = 1920, FH = 1080, PANEL = 576;     // the frames were composed at 1920 x 1080 with a 576 px text panel on the left
 
@@ -184,7 +187,7 @@ const STEPS = [
     src: `Area: state profiles. Rice: PIB, KMS 2023–24 (Punjab 124.14 LMT; all India at least 489.15 LMT by 24 May 2024, so Punjab's share is at most 25%). Rivers: Natural Earth; the name, Encyclopaedia Britannica, “Punjab” (region).` },
   { frame: "f4_blocks", title: "Sangrur and Barnala: 11 blocks", on: ["area", "district", "blocks"], labels: "blocks",
     fact: "Two districts, 11 blocks, about 4,300 km². Paddy covers 80.9% of the ground.",
-    extra: "Almost all of it is watered from below: <b>tubewells irrigate 72% of Sangrur's irrigated land and 52% of Barnala's</b>. The water the paddy drinks comes out of the ground under it.",
+    extra: "Most of it is watered from below: <b>tubewells irrigate 72% of Sangrur's irrigated land and 52% of Barnala's</b>; canals water the rest.",
     src: `Paddy: Open-SARice-10 (Zenodo 18905953), satellite map, 2021; official crop statistics give 81.9% (DES via India Data Portal). Area: measured from CGWB's block outlines. Irrigation: DES land-use statistics 2023–24 via India Data Portal (Sangrur 183,969 of 255,448 ha; Barnala 64,824 of 123,639 ha).` },
   { frame: "f4_blocks", title: "The water table falls", on: ["area", "district", "blocks", "wells"],
     fact: "Every monitoring well with enough readings is falling: 23 of 23, at 1 to 19 m a decade.", chart: "wells",
