@@ -42,11 +42,12 @@ const MASKS = [["punjab", "Punjab's outline", "punjab", ["punjab_line"]],
 const MASK_DEF = { on: false, op: 0.6, col: "#000000" };
 const signedArea = r => r.reduce((s, p, i) => { const q = r[(i + 1) % r.length]; return s + (p[0] * q[1] - q[0] * p[1]); }, 0) / 2;
 
-export function initTune({ map, steps, getStep, defaultOn, defaultHatch, defaultMask, places, defaultPlaces, scale, linked = {} }) {
+export function initTune({ map, steps, getStep, defaultOn, defaultHatch, defaultMask, places, defaultPlaces, scale, linked = {}, icon = null }) {
   const KEY = "hookTune";
   // linked slides (Krishna, 10 Nov: slides 5 and 6 match slide 4): a linked slide shows and edits its source slide's settings
   const src = st => linked[st] ?? st;
-  const EMPTY = () => ({ lines: {}, places: {}, hatches: {}, mask: {} });
+  const EMPTY = () => ({ lines: {}, places: {}, hatches: {}, mask: {}, icon: {} });   // icon: the slide-5 well icons, one setting for all slides
+  const iconDef = icon ? { ...icon.obj } : {};
   let saved = EMPTY();
   try { saved = Object.assign(saved, JSON.parse(localStorage.getItem(KEY) || "{}")); } catch (e) {}
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {} };
@@ -125,7 +126,8 @@ export function initTune({ map, steps, getStep, defaultOn, defaultHatch, default
       }
     }).catch(e => console.warn("mask:", e));
   }
-  function apply(st = getStep()) { st = src(st); applyLines(st); applyHatches(st); applyPlaces(st); applyMask(st); }
+  function applyIcon() { if (icon) { Object.assign(icon.obj, iconDef, saved.icon || {}); icon.redraw(); } }
+  function apply(st = getStep()) { applyIcon(); st = src(st); applyLines(st); applyHatches(st); applyPlaces(st); applyMask(st); }
 
   // ---------- the panel ----------
   const panel = document.createElement("div");
@@ -193,6 +195,12 @@ export function initTune({ map, steps, getStep, defaultOn, defaultHatch, default
           <input type="range" data-k="op" min="0" max="1" step="0.05" value="${mk.op}"><input type="color" data-k="col" value="${mk.col}">
         </div></div>`;
     }
+    if (icon) {
+      h += `<h3>Well icons (slide 5)</h3><div class="row" data-icon="1"><div class="ctl" style="margin-left:0">`;
+      for (const [k, label, lo, hi, step, unit] of icon.fields)
+        h += `<span>${label}: <b>${icon.obj[k]}</b> ${unit}</span><input type="range" data-k="${k}" min="${lo}" max="${hi}" step="${step}" value="${icon.obj[k]}">`;
+      h += `</div><div class="note">Same on every slide. Reset all slides also resets these.</div></div>`;
+    }
     h += `<h3>Places</h3>`;
     for (const [kind, label] of [["capital", "Capitals and big cities"], ["hq", "Punjab district headquarters"], ["belt", "Belt towns"]]) {
       h += `<div class="kind">${label} <button data-all="${kind}">all</button><button data-none="${kind}">none</button></div><div class="places">`;
@@ -206,6 +214,8 @@ export function initTune({ map, steps, getStep, defaultOn, defaultHatch, default
   }
   panel.addEventListener("input", e => {
     const row = e.target.closest(".row"), st = src(getStep());
+    if (row && row.dataset.icon) { const k = e.target.dataset.k, v = +e.target.value; saved.icon = saved.icon || {}; saved.icon[k] = v; save(); applyIcon();
+      e.target.previousElementSibling.querySelector("b").textContent = v; return; }
     if (row && row.dataset.mask) {                      // the mask
       const k = e.target.dataset.k, v = k === "on" ? e.target.checked : k === "op" ? +e.target.value : e.target.value;
       set("mask", row.dataset.mask, st, { [k]: v });

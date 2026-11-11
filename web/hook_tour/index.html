@@ -44,6 +44,7 @@
   #placeholder { position: absolute; right: 50px; top: 12px; z-index: 2; font-size: 10px; letter-spacing: .1em; text-transform: uppercase;
                  color: #ffcf6b; border: 1px solid #ffcf6b; padding: 4px 8px; }
   /* hover box: name bold, values, italic type line, then the source (Drought Interfaces has no source line; we do) */
+  .maplibregl-popup.hov { z-index: 5; }   /* hover box in front of the well icons (#ticks, z 1) and the labels */
   .hov .maplibregl-popup-content { background: rgba(8,10,16,.88); color: var(--ink); padding: 7px 9px; border-radius: 3px; font: 11px/1.45 var(--font); box-shadow: none; max-width: 260px; }
   .hov .maplibregl-popup-tip { display: none; }
   .hov p { margin: 0; color: var(--ink2); } .hov p:first-child { color: var(--ink); font-weight: 700; }
@@ -73,7 +74,7 @@
 <script type="module">
 import { addLiveGrain } from "./live_grain.js?v=ramp1";   // ?v: bump when live_grain.js changes, so browsers drop the cached copy
 import { loadFigmaStyles, applyFigmaStyles } from "./figma_styles.js";
-import { initTune } from "./hook_tune.js?v=link1";
+import { initTune } from "./hook_tune.js?v=icon1";
 import { flipToSection } from "./flip.js";   // last slide, -> : the outline flips into the soil section (Krishna, 10 Nov)
 let TUNE = null;   // the per-slide tuning panel (T), set up once the data is loaded
 const Q = new URLSearchParams(location.search);
@@ -273,7 +274,8 @@ const HOVER = [["wells_l_hit", "wellsLong"], ["wells_m_hit", "wells"], ["canals_
 
 // ============ wells as down-ticks (Krishna, 8 Nov): a tick hangs from each well; length = depth to water, 1 m = 1 px at frame scale ============
 // Drawn in an SVG over the map and redrawn every frame. Long-record wells: solid to the first reading, dashed on to the latest.
-const TICK = { pxPerM: 1, bar: 9, mark: 4.5, width: 3, longThin: 1.5, dash: "4 3", colour: "#fff", opacity: 0.9 };
+const TICK = { pxPerM: 1.5, bar: 16, mark: 7, width: 4,   // Krishna, 10 Nov: bigger; tunable in the T panel ("Well icons")
+                longThin: 1.5, dash: "4 3", colour: "#fff", opacity: 0.9 };
 const ticksSvg = document.getElementById("ticks");
 function drawTicks() {
   // Krishna, 10 Nov: each well as a small section: ground bar, line down to the water table (latest reading), water mark; red by rate of fall
@@ -416,6 +418,8 @@ map.on("load", async () => {
   // tuning panel (T): per-slide lines and places. Defaults reproduce the tour as it was: slide 2 shows the 7 cities, slide 7 the belt towns.
   const cityNames = new Set(CITIES.map(c => c[0])), townNames = new Set(DATA.towns.features.map(f => f.properties.name));
   TUNE = initTune({ map, steps: STEPS, getStep: () => step, scale: () => s, places: DATA.places,
+    icon: { obj: TICK, redraw: drawTicks, fields: [["bar", "Ground bar width", 4, 40, 1, "px"], ["mark", "Water mark ▽ size", 2, 20, 0.5, "px"],
+            ["width", "Line weight", 0.5, 10, 0.25, "px"], ["pxPerM", "Depth scale", 0.5, 4, 0.1, "px per m"], ["opacity", "Opacity", 0.2, 1, 0.05, ""]] },
     defaultOn: (id, st) => { const want = new Set(MAPLAYERS.base); STEPS[st].on.forEach(k => MAPLAYERS[k].forEach(x => want.add(x))); return want.has(id); },
     defaultHatch: (id, st) => id === "belt_hatch" ? STEPS[st].on.includes("belt") : STEPS[st].frame === "f3_punjab",
     defaultMask: (id, st) => (id === "punjab" && st === 2) || (id === "area" && [3, 4, 5].includes(st)),   // Krishna, 10 Nov: outside Punjab dimmed on slide 3, outside Sangrur-Barnala on slides 4-6
