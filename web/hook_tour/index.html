@@ -19,7 +19,7 @@
      hierarchy (red kicker, bold italic uppercase title, body, grey source), sizes in frame px (--u = 1 px of the 1920 x 1080 frame).
      White on the dark panel where the other acts are black on white. */
   :root { --ground: hsl(222, 56%, 4%); --ink: #fff; --ink2: rgba(255,255,255,.78); --ink3: rgba(255,255,255,.55); --red: #c8102e;
-          --panel: rgba(8, 10, 16, .82); --rule: rgba(255,255,255,.2); --font: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif;
+          --panel: rgba(0, 0, 0, .82);   /* Krishna, 11 Nov: black, same opacity on every slide */ --rule: rgba(255,255,255,.2); --font: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif;
           --u: min(calc(100vw / 1920), calc(100vh / 1080)); }
   html, body { margin: 0; height: 100%; background: var(--ground); color: var(--ink); font-family: var(--font); overflow: hidden; }
   #map { position: absolute; inset: 0; }
@@ -67,7 +67,7 @@
   #tools button { width: 30px; height: 30px; background: var(--panel); color: var(--ink); border: 1px solid var(--rule); cursor: pointer; font: 15px var(--font); }
   /* hover box: name bold, values, italic type line, then the source */
   .maplibregl-popup.hov { z-index: 5; }   /* hover box in front of the well icons (#ticks, z 1) and the labels */
-  .hov .maplibregl-popup-content { background: rgba(8,10,16,.9); color: var(--ink); padding: calc(9 * var(--u)) calc(11 * var(--u)); border-radius: 0;
+  .hov .maplibregl-popup-content { background: rgba(0,0,0,.9); color: var(--ink); padding: calc(9 * var(--u)) calc(11 * var(--u)); border-radius: 0;
                                    font: calc(13 * var(--u))/1.45 var(--font); box-shadow: none; max-width: calc(300 * var(--u)); }
   .hov .maplibregl-popup-tip { display: none; }
   .hov p { margin: 0; color: var(--ink2); } .hov p:first-child { color: var(--ink); font-weight: 700; }
