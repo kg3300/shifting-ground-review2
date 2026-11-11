@@ -41,7 +41,8 @@
   #s .zone { font-size:15px; font-weight:700; letter-spacing:.1em; }
   #s .key { font-size:13px; fill:var(--grey); }
   /* white halo on well labels, so they read where they fall on the soil photo */
-  #s .yr, #s .nm, #s .bk { paint-order:stroke; stroke:#fff; stroke-width:3.5px; stroke-linejoin:round; }
+  #s .yr, #s .nm, #s .bk, #s .mat { paint-order:stroke; stroke:#fff; stroke-width:3.5px; stroke-linejoin:round; }
+  #s .mat { font-size:13px; font-style:italic; fill:#000; }
 </style>
 </head>
 <body>
@@ -72,15 +73,34 @@ let h = "";
 // bands: drained since 1985 (lightest); saturated today = photo 1 (Krishna, 10 Nov): a real cut soil face (US National Archives,
 // public domain; img/soil_nara_286175.jpg, cropped from img_src/), scaled to the band's height and repeated across, every other copy
 // mirrored so the seams don't show; a white wash keeps the wells and labels readable. Illustrative: it is not this site's ground.
-const SOIL = { src: "img/soil_nara_286175.jpg", w: 592, h: 800, wash: 0.35 };
-const bandY = y(t23.m), bandH = B - bandY, tw = bandH * SOIL.w / SOIL.h;
-h += `<defs><pattern id="soil" patternUnits="userSpaceOnUse" x="${X0}" y="${bandY}" width="${2 * tw}" height="${bandH}">
-        <image href="${SOIL.src}" x="0" y="0" width="${tw}" height="${bandH}" preserveAspectRatio="none"/>
-        <image href="${SOIL.src}" x="0" y="0" width="${tw}" height="${bandH}" preserveAspectRatio="none" transform="translate(${2 * tw} 0) scale(-1 1)"/>
-      </pattern></defs>
-      <rect x="${X0}" y="${y(t85.m)}" width="${X1 - X0}" height="${y(t23.m) - y(t85.m)}" fill="#000" fill-opacity="0.035"/>
-      <rect x="${X0}" y="${bandY}" width="${X1 - X0}" height="${bandH}" fill="url(#soil)"/>
-      <rect x="${X0}" y="${bandY}" width="${X1 - X0}" height="${bandH}" fill="#fff" fill-opacity="${SOIL.wash}"/>`;
+// Layers above the water table (Krishna's picks S3, A2, C2, K1: ISRIC monoliths, CC BY-SA 3.0; crop_soil.py). The materials are
+// documented for the belt (sand, silt and clay with kankar; clay beds dominate); the ORDER AND DEPTHS BELOW ARE ILLUSTRATIVE until
+// they are set from a borehole log in CGWB's Sangrur aquifer report. Each texture is tiled at one scale (tile TH px tall), every
+// other copy mirrored. Wash: paler above the 2023 water table (dry ground), stronger photo below it (wet).
+const TEX = { silt: { src: "img/layer_silt_PE-005.jpg", w: 600, h: 745 }, sand: { src: "img/layer_sand_BR-020.jpg", w: 600, h: 700 },
+              clay: { src: "img/layer_clay_IT-011.jpg", w: 600, h: 683 }, kankar: { src: "img/layer_kankar_IN-011.jpg", w: 600, h: 745 },
+              nara: { src: "img/soil_nara_286175.jpg", w: 592, h: 800 } };
+const TH = 230, DRY_WASH = 0.5, WET_WASH = 0.35;
+const LAYERS = [
+  { from: 0,     to: 12,    tex: "silt",   label: "Silt and loam" },
+  { from: 12,    to: 17,    tex: "kankar", label: "Silt with kankar (lime nodules)" },
+  { from: 17,    to: 26,    tex: "sand",   label: "Fine sand" },
+  { from: 26,    to: 31,    tex: "clay",   label: "Clay" },
+  { from: 31,    to: t23.m, tex: "sand",   label: "Sand" },
+  { from: t23.m, to: MAXD,  tex: "nara",   label: "", fit: true },   // the saturated band: photo 1, fitted to the band's height
+];
+let defs = "", bands = "";
+LAYERS.forEach((L, i) => {
+  const T = TEX[L.tex], y0 = y(L.from), y1 = y(L.to), th = L.fit ? y1 - y0 : TH, tw = th * T.w / T.h, wet = L.from >= t23.m;
+  defs += `<pattern id="tex${i}" patternUnits="userSpaceOnUse" x="${X0}" y="${y0}" width="${2 * tw}" height="${th}">
+      <image href="${T.src}" x="0" y="0" width="${tw}" height="${th}" preserveAspectRatio="none"/>
+      <image href="${T.src}" x="0" y="0" width="${tw}" height="${th}" preserveAspectRatio="none" transform="translate(${2 * tw} 0) scale(-1 1)"/></pattern>`;
+  bands += `<rect x="${X0}" y="${y0}" width="${X1 - X0}" height="${y1 - y0}" fill="url(#tex${i})"/>
+      <rect x="${X0}" y="${y0}" width="${X1 - X0}" height="${y1 - y0}" fill="#fff" fill-opacity="${wet ? WET_WASH : DRY_WASH}"/>
+      <line x1="${X0}" x2="${X1}" y1="${y0}" y2="${y0}" stroke="#fff" stroke-width="1"/>`;
+  if (L.label) bands += `<text x="${X0 + 8}" y="${(y0 + y1) / 2 + 4}" class="mat">${L.label}</text>`;
+});
+h += `<defs>${defs}</defs>${bands}`;
 // depth axis
 for (let m = 0; m <= MAXD; m += 10) h += `<line x1="${X0 - 22}" x2="${X0 - 14}" y1="${y(m)}" y2="${y(m)}" stroke="#000"/><text x="${X0 - 30}" y="${y(m) + 4.5}" class="ax" text-anchor="end">${m} m</text>`;
 h += `<line x1="${X0 - 18}" x2="${X0 - 18}" y1="${G}" y2="${B}" stroke="#000"/>`;
@@ -126,7 +146,8 @@ h += `<line x1="38" x2="38" y1="${ky}" y2="${ky + 20}" stroke="#000" stroke-widt
       <text x="56" y="${ky + 24.5}" class="key">First reading</text><text x="56" y="${ky + 46.5}" class="key">Last reading. Red = how far the water fell at that well</text>
       <text x="520" y="${ky + 24.5}" class="key">Wells first read in 2013–18 start deep because the water was already deep there, not because their blocks fell less.</text>
       <text x="520" y="${ky + 46.5}" class="key">Position = longitude, west to east; close wells nudged apart (order kept). Excluded: one Sehna well with an impossible first reading (100.0 m).</text>
-      <text x="520" y="${ky + 68.5}" class="key">Saturated band: photograph of a soil cut-away, Missouri (US National Archives, 286175), public domain. Illustrative, not this site's ground.</text>`;
+      <text x="520" y="${ky + 68.5}" class="key">Ground: photographs of real soils, not this site's. Materials as documented for the belt (sand, silt, clay, kankar); their order and depths are illustrative.</text>
+      <text x="520" y="${ky + 90.5}" class="key">Photos: ISRIC World Soil Reference Collection PE-005, BR-020, IT-011, IN-011 (CC BY-SA 3.0); soil cut-away, Missouri (US National Archives 286175, public domain).</text>`;
 document.getElementById("s").innerHTML = h;
 document.title = "Soil section";
 requestAnimationFrame(() => document.body.classList.add("in"));
