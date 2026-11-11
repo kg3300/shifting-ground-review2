@@ -72,6 +72,7 @@
 import { addLiveGrain } from "./live_grain.js";
 import { loadFigmaStyles, applyFigmaStyles } from "./figma_styles.js";
 import { initTune } from "./hook_tune.js";
+import { flipToSection } from "./flip.js";   // last slide, -> : the outline flips into the soil section (Krishna, 10 Nov)
 let TUNE = null;   // the per-slide tuning panel (T), set up once the data is loaded
 const Q = new URLSearchParams(location.search);
 // Krishna's Figma styles (style_reader.py output). ?styles=<url> to try another file; ?placeholder to ignore them.
@@ -354,7 +355,11 @@ document.getElementById("zin").onclick = () => map.zoomIn(); document.getElement
 addEventListener("keydown", e => {
   if (e.key === "t" || e.key === "T") { if (TUNE) TUNE.toggle(); return; }
   if (e.target.closest && e.target.closest("#tune")) return;     // keys adjust the focused control in the tuning panel
-  if (e.key === "ArrowRight" || e.key === " ") { e.preventDefault(); go(step + 1); }
+  if (e.key === "ArrowRight" || e.key === " ") {
+    e.preventDefault();
+    if (step === STEPS.length - 1 && window.HOOK && !window.FLIPPING) { window.FLIPPING = true; flipToSection(map); }
+    else go(step + 1);
+  }
   if (e.key === "ArrowLeft") go(step - 1);
   if (e.key === "h" || e.key === "H") document.getElementById("home").click();
   if (e.key === "f" || e.key === "F") toggleFps();

@@ -18,6 +18,9 @@
                font-family: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif; }
   body { opacity:0; transition:opacity .5s ease; }   /* fades in and out between acts, as the Prover */
   body.in { opacity:1; }
+  /* intro (from the hook's flip): card, indicator, labels and key fade in last */
+  #card, #water, #s .fade { transition:opacity .6s ease; }
+  body.intro:not(.show) #card, body.intro:not(.show) #water, body.intro:not(.show) #s .fade { opacity:0; }
   #s { position:fixed; inset:0; width:100vw; height:100vh; display:block; }
   /* the card, same place and type as the collage and Prover cards */
   #card { position:fixed; left:calc(30 * var(--u)); top:calc(var(--oy) + 30 * var(--u)); width:calc(1000 * var(--u)); }
@@ -58,7 +61,16 @@
 <div id="water"><div class="num" id="wnum">40.0 m</div><div class="lab">Water below ground · 2023</div><div class="src">Median of the belt's CGWB monitoring wells, pre-monsoon</div></div>
 
 <script type="module">
-const X0 = 150, X1 = 1500, G = 330, PX_PER_M = 9.5, MAXD = 60, PUMP = 9, RX = 1530, MINGAP = 62;
+import { SECTION } from "./geometry.js";
+const { X0, X1, G } = SECTION;            // shared with the hook's flip (hook_tour/flip.js), so its outline lands on this ground line
+const PX_PER_M = 9.5, MAXD = 60, PUMP = 9, RX = 1530, MINGAP = 62;
+// ?from=hook: arrived from the hook's flip. Start from the bare ground line (where the flip left it) and build the section:
+// the layers wipe down, the wells drop in west to east, then the card, labels and key fade in (Krishna, 10 Nov).
+const INTRO = new URLSearchParams(location.search).get("from") === "hook";
+if (INTRO) {
+  document.body.style.transition = "none"; document.body.classList.add("in", "intro");
+  document.getElementById("s").innerHTML = `<line x1="${X0}" x2="${X1}" y1="${G}" y2="${G}" stroke="#000" stroke-width="${SECTION.GROUND_W}"/>`;
+}
 const RED = "#c8102e", GREY = "#6b6b6b";
 const get = async u => (await fetch(u)).json();
 const [sec, water, area] = await Promise.all([get("wells_section.json"), get("../collage/water.json"), get("../../kit/data/area_outline.geojson")]);
@@ -106,7 +118,8 @@ PARTS.forEach((L, i) => {
       <line x1="${X0}" x2="${X1}" y1="${y0}" y2="${y0}" stroke="#fff" stroke-width="1"/>`;
   if (L.label) bands += `<text x="${X0 + 8}" y="${(y0 + y1) / 2 + 4}" class="mat">${L.label}</text>`;
 });
-h += `<defs>${defs}</defs>${bands}`;
+h += `<defs>${defs}<clipPath id="wipe"><rect id="wipeR" x="0" y="${G}" width="1920" height="${B - G + 12}" data-h="${B - G + 12}"/></clipPath></defs>
+      <g id="gBands" clip-path="url(#wipe)">${bands}</g><g id="gInfo" class="fade">`;
 // depth axis
 for (let m = 0; m <= MAXD; m += 10) h += `<line x1="${X0 - 22}" x2="${X0 - 14}" y1="${y(m)}" y2="${y(m)}" stroke="#000"/><text x="${X0 - 30}" y="${y(m) + 4.5}" class="ax" text-anchor="end">${m} m</text>`;
 h += `<line x1="${X0 - 18}" x2="${X0 - 18}" y1="${G}" y2="${B}" stroke="#000"/>`;
@@ -122,16 +135,18 @@ const zy1 = (y(t85.m) + y(t23.m)) / 2, zy2 = (y(t23.m) + B) / 2;
 h += `<text x="${RX}" y="${zy1}" class="zone">DRAINED SINCE 1985</text><text x="${RX}" y="${zy1 + 20}" class="lab">${r(t23.m - t85.m)} m of ground that was full of water,</text>
       <text x="${RX}" y="${zy1 + 38}" class="lab">most of the upper sand aquifer</text>
       <text x="${RX}" y="${zy2}" class="zone">SATURATED</text><text x="${RX}" y="${zy2 + 20}" class="lab">clay holds water but gives little;</text>
-      <text x="${RX}" y="${zy2 + 38}" class="lab">the sand below it is the aquifer</text>`;
+      <text x="${RX}" y="${zy2 + 38}" class="lab">the sand below it is the aquifer</text></g>`;
 // the 15 wells
 const ws = sec.wells.map(w => ({ ...w, X: x(w.lon) }));
 for (let pass = 0; pass < 40; pass++)
   for (let i = 1; i < ws.length; i++) { const d = ws[i].X - ws[i - 1].X; if (d < MINGAP) { const k = (MINGAP - d) / 2; ws[i - 1].X -= k; ws[i].X += k; } }
 const nameOf = w => w.name.replace(/-\s*P[Zz].*$/, "").replace(/ M$/, "").trim();
 ws.forEach((w, i) => { w.NY = y(w.d1) + 24; const p = ws[i - 1]; if (p && w.X - p.X < 90 && Math.abs(w.NY - p.NY) < 34) w.NY = p.NY + 34; });
-for (const w of ws) {
-  const xx = r(w.X), ya = r(y(w.d0)), yb = r(y(w.d1));
-  h += `<g><title>${w.name} (${w.block}): ${w.d0} m in ${w.y0}, ${w.d1} m in ${w.y1} (${w.n} pre-monsoon readings)</title>
+let wellClips = "";
+ws.forEach((w, i) => {
+  const xx = r(w.X), ya = r(y(w.d0)), yb = r(y(w.d1)), full = r(w.NY + 22 - G + 4);   // each well is revealed by a clip that grows down
+  wellClips += `<clipPath id="wc${i}"><rect class="wcr" x="${xx - 90}" y="${G - 1}" width="180" height="${full}" data-h="${full}"/></clipPath>`;
+  h += `<g class="well" clip-path="url(#wc${i})"><title>${w.name} (${w.block}): ${w.d0} m in ${w.y0}, ${w.d1} m in ${w.y1} (${w.n} pre-monsoon readings)</title>
         <line x1="${xx}" x2="${xx}" y1="${G}" y2="${ya}" stroke="#000" stroke-width="2"/>
         <line x1="${xx}" x2="${xx}" y1="${ya}" y2="${yb}" stroke="${RED}" stroke-width="3"/>
         <circle cx="${xx}" cy="${ya}" r="5.5" fill="#fff" stroke="${RED}" stroke-width="2"/>
@@ -140,31 +155,53 @@ for (const w of ws) {
         <text x="${xx + 9}" y="${yb + 4.5}" class="yr">${w.y1}</text>
         <text x="${xx}" y="${r(w.NY)}" class="nm" text-anchor="middle">${nameOf(w)}</text>
         <text x="${xx}" y="${r(w.NY + 15)}" class="bk" text-anchor="middle">${w.block}</text></g>`;
-}
+});
+h += `<defs>${wellClips}</defs>`;
 // ground line, ends, break at 60 m
 let zig = `M ${X0} ${B}`; for (let xx = X0, k = 0; xx < X1; xx += 24, k++) zig += ` L ${Math.min(xx + 12, X1)} ${B + (k % 2 ? -6 : 6)} L ${Math.min(xx + 24, X1)} ${B}`;
-h += `<line id="ground" x1="${X0 - 18}" x2="${X1}" y1="${G}" y2="${G}" stroke="#000" stroke-width="3"/>
+h += `<line id="ground" x1="${X0}" x2="${X1}" y1="${G}" y2="${G}" stroke="#000" stroke-width="${SECTION.GROUND_W}"/>
+      <g id="gInfo2" class="fade"><line x1="${X0 - 18}" x2="${X0}" y1="${G}" y2="${G}" stroke="#000" stroke-width="${SECTION.GROUND_W}"/>
       <text x="${X0}" y="${G - 12}" class="ax">WEST · ${W.toFixed(2)}° E</text><text x="${X1}" y="${G - 12}" class="ax" text-anchor="end">EAST · ${E.toFixed(2)}° E</text>
       <path d="${zig}" fill="none" stroke="#000" stroke-width="1.5"/>
-      <text x="${RX}" y="${B - 4}" class="lab">The aquifer continues below:</text><text x="${RX}" y="${B + 14}" class="key">CGWB's deepest wells here reach about 300 m</text>`;
+      <text x="${RX}" y="${B - 4}" class="lab">The aquifer continues below:</text><text x="${RX}" y="${B + 14}" class="key">CGWB's deepest wells here reach about 300 m</text></g>`;
 // key, bottom left
 const ky = 968;
-h += `<line x1="38" x2="38" y1="${ky}" y2="${ky + 20}" stroke="#000" stroke-width="2"/><line x1="38" x2="38" y1="${ky + 20}" y2="${ky + 42}" stroke="${RED}" stroke-width="3"/>
+h += `<g id="gKey" class="fade"><line x1="38" x2="38" y1="${ky}" y2="${ky + 20}" stroke="#000" stroke-width="2"/><line x1="38" x2="38" y1="${ky + 20}" y2="${ky + 42}" stroke="${RED}" stroke-width="3"/>
       <circle cx="38" cy="${ky + 20}" r="5.5" fill="#fff" stroke="${RED}" stroke-width="2"/><circle cx="38" cy="${ky + 42}" r="5.5" fill="${RED}"/>
       <text x="56" y="${ky + 24.5}" class="key">First reading</text><text x="56" y="${ky + 46.5}" class="key">Last reading. Red = how far the water fell at that well</text>
       <text x="520" y="${ky + 24.5}" class="key">Wells first read in 2013–18 start deep because the water was already deep there, not because their blocks fell less.</text>
       <text x="520" y="${ky + 46.5}" class="key">Position = longitude, west to east; close wells nudged apart (order kept). Excluded: one Sehna well with an impossible first reading (100.0 m).</text>
       <text x="520" y="${ky + 68.5}" class="key">Layers after CGWB's lithological cross-sections, Barnala and Sangrur aquifer mapping reports (simplified; kankar depth schematic). Textures: photographs of real soils, not this site's.</text>
-      <text x="520" y="${ky + 90.5}" class="key">Photos: ISRIC World Soil Reference Collection PE-005, BR-020, IT-011, IN-011 (CC BY-SA 3.0).</text>`;
-document.getElementById("s").innerHTML = h;
+      <text x="520" y="${ky + 90.5}" class="key">Photos: ISRIC World Soil Reference Collection PE-005, BR-020, IT-011, IN-011 (CC BY-SA 3.0).</text></g>`;
+
+const svg = document.getElementById("s");
+const ease = t => t < 0 ? 0 : t > 1 ? 1 : t * t * (3 - 2 * t);
+const tween = (ms, f) => new Promise(done => { const t0 = performance.now();
+  const k = now => { const t = Math.min(1, (now - t0) / ms); f(ease(t)); if (t < 1) requestAnimationFrame(k); else done(); }; requestAnimationFrame(k); });
+if (INTRO) {
+  // load the textures before the build starts, so the wipe shows soil, not blanks (at most 1.5 s)
+  const srcs = [...new Set(PARTS.map(L => TEX[L.tex].src))];
+  await Promise.race([Promise.all(srcs.map(s => { const im = new Image(); im.src = s; return im.decode().catch(() => {}); })),
+                      new Promise(r => setTimeout(r, 1500))]);
+  svg.innerHTML = h;
+  const wipe = svg.querySelector("#wipeR"), rects = [...svg.querySelectorAll(".wcr")];
+  [wipe, ...rects].forEach(el => el.setAttribute("height", 0));
+  await tween(1100, e => wipe.setAttribute("height", e * +wipe.dataset.h));                         // layers wipe down
+  await Promise.all(rects.map((el, i) => new Promise(res => setTimeout(() =>                     // wells drop, west to east
+    tween(450, e => el.setAttribute("height", e * +el.dataset.h)).then(res), i * 90))));
+  document.body.classList.add("show");                                                           // card, labels, key
+} else {
+  svg.innerHTML = h;
+  requestAnimationFrame(() => document.body.classList.add("in"));
+}
 document.title = "Soil section";
-requestAnimationFrame(() => document.body.classList.add("in"));
-// → (or PageDown / Space) fades into the collage, as the collage's last → fades into the Prover. The hook is not wired to this page yet.
+// → (or PageDown / Space) fades into the collage, as the collage's last → fades into the Prover; ← goes back to the hook's last slide
 let leaving = false;
 addEventListener("keydown", e => {
-  if (leaving || !["ArrowRight", "PageDown", " "].includes(e.key)) return;
-  e.preventDefault(); leaving = true; document.body.classList.remove("in");
-  setTimeout(() => { location.href = "../collage/index.html"; }, 500);
+  const next = ["ArrowRight", "PageDown", " "].includes(e.key), back = ["ArrowLeft", "PageUp"].includes(e.key);
+  if (leaving || !(next || back)) return;
+  e.preventDefault(); leaving = true; document.body.style.transition = ""; document.body.classList.remove("in");
+  setTimeout(() => { location.href = next ? "../collage/index.html" : "../hook_tour/index.html?step=6"; }, 500);
 });
 </script>
 </body>
