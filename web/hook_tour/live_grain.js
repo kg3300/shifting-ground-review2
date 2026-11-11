@@ -4,7 +4,7 @@
 // How it works, inside each frame MapLibre draws:
 //   1. share_raster: the paddy share as data tiles (grey = share; web/tiles/render_share_tiles.py), drawn in true map projection;
 //   2. cap_share:    copies that frame off the screen into a texture, then wipes the screen;
-//   3. mask_fill:    the 11 blocks in white (for the red overdraft dots);
+//   3. mask_fill:    the 11 blocks in grey = their stage of extraction (for the red overdraft dots, light to dark);
 //   4. cap_mask:     copies that into a second texture, then wipes the screen;
 //   5. the real map starts: ground, satellite;
 //   6. cap_sat:      copies the satellite (for the grey globe cells);
@@ -16,7 +16,7 @@ const VS = `attribute vec2 a; void main(){ gl_Position = vec4(a * 2.0 - 1.0, 0.0
 const FS = `precision highp float;
 uniform sampler2D uShare, uMask, uSat;
 uniform vec2 uRes; uniform float uP, uR, uMix, uRed, uOp;
-uniform vec3 uGreen, uRedC;
+uniform vec3 uGreen, uRedC, uRedLo, uRedHi;
 void main() {
   vec2 fc = gl_FragCoord.xy;
   vec2 c = (floor(fc / uP) + 0.5) * uP;                    // centre of this 4 px cell
@@ -28,11 +28,13 @@ void main() {
   for (int i = 0; i < 2; i++) for (int j = 0; j < 2; j++)  // mean satellite grey over the cell (alpha 0 = space beyond the globe)
     sat += texture2D(uSat, (c + (vec2(float(i), float(j)) - 0.5) * uP * 0.5) / uRes);
   sat /= 4.0;
-  float inBlocks = step(0.5, texture2D(uMask, c / uRes).r);
+  // the mask holds each block's stage of extraction: 0 outside, 0.25 at the ramp's low end (100%) .. 1 at its high end
+  float m = texture2D(uMask, c / uRes).r, inBlocks = step(0.1, m), lvl = clamp((m - 0.25) / 0.75, 0.0, 1.0);
+  vec3 redC = lvl < 0.5 ? mix(uRedLo, uRedC, lvl * 2.0) : mix(uRedC, uRedHi, lvl * 2.0 - 1.0);
   // dot: area proportional to share (radius = rmax * sqrt(share)), soft 1 px edge; none below 2% paddy, as in the stills
   float r = uR * sqrt(sh), d = length(fc - c);
   float dotA = clamp(r - d + 0.5, 0.0, 1.0) * step(0.02, sh);
-  vec3 dotC = mix(uGreen, uRedC, uRed * inBlocks);
+  vec3 dotC = mix(uGreen, redC, uRed * inBlocks);
   // globe-scale cell: a square 3/4 of the pitch, grey = luminance of the satellite under it
   vec2 q = abs(fc - c); float hw = uP * 0.375;
   float cellA = clamp(hw - max(q.x, q.y) + 0.5, 0.0, 1.0) * step(0.99, sat.a);
@@ -82,6 +84,7 @@ class Dots {
     gl.uniform1f(this.U("uP"), this.pitch * s * dpr); gl.uniform1f(this.U("uR"), this.rmax * s * dpr);
     gl.uniform1f(this.U("uMix"), mix); gl.uniform1f(this.U("uRed"), this.red); gl.uniform1f(this.U("uOp"), this.op);
     gl.uniform3fv(this.U("uGreen"), hex(this.green)); gl.uniform3fv(this.U("uRedC"), hex(this.redColour));
+    gl.uniform3fv(this.U("uRedLo"), hex(this.redRamp.lo)); gl.uniform3fv(this.U("uRedHi"), hex(this.redRamp.hi));
     gl.disable(gl.DEPTH_TEST); gl.disable(gl.STENCIL_TEST); gl.disable(gl.CULL_FACE);
     gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
@@ -90,17 +93,17 @@ class Dots {
 }
 
 // map: a loaded MapLibre map whose style has layers "ground" (background), "sat" (satellite) and `before` (first layer above the grain)
-export function addLiveGrain(map, { before, blocksSource, shareTiles, green, redColour, rmax = 1.9, pitch = 4, scale, dz }) {
+export function addLiveGrain(map, { before, blocksSource, shareTiles, green, redColour, redRamp, rmax = 1.9, pitch = 4, scale, dz }) {
   const first = map.getStyle().layers[0].id;   // everything for the hidden passes goes underneath the visible map
   map.addSource("paddy_share", { type: "raster", tileSize: 256, minzoom: 4, maxzoom: 12, tiles: [shareTiles] });
   map.addLayer({ id: "share_raster", type: "raster", source: "paddy_share", paint: { "raster-fade-duration": 0, "raster-resampling": "linear" } }, first);
   const capShare = new Capture("cap_share", true), capMask = new Capture("cap_mask", true), capSat = new Capture("cap_sat", false);
   map.addLayer(capShare, first);
   // opacity just under 1: a fully opaque fill is drawn in MapLibre's early opaque pass, out of order, and would hide the share layer
-  map.addLayer({ id: "mask_fill", type: "fill", source: blocksSource, paint: { "fill-color": "#fff", "fill-opacity": 0.999, "fill-antialias": false } }, first);
+  map.addLayer({ id: "mask_fill", type: "fill", source: blocksSource, paint: { "fill-color": ["interpolate", ["linear"], ["get", "stage_pct"], redRamp.from, "rgb(64,64,64)", redRamp.to, "rgb(255,255,255)"], "fill-opacity": 0.999, "fill-antialias": false } }, first);
   map.addLayer(capMask, first);
   map.addLayer(capSat, before);
-  const dots = new Dots({ share: capShare, mask: capMask, sat: capSat, green, redColour, rmax, pitch, scale, dz });
+  const dots = new Dots({ share: capShare, mask: capMask, sat: capSat, green, redColour, redRamp, rmax, pitch, scale, dz });
   map.addLayer(dots, before);
   return dots;
 }

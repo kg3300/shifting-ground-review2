@@ -50,6 +50,8 @@
   .hov .type { font-style: italic; } .hov .src { color: var(--ink3); font-size: 10px; margin-top: 3px; } .hov .warn { color: #ffcf6b; }
   .lbl { font: 12px var(--font); color: var(--ink); text-shadow: 0 0 3px #000, 0 0 2px #000; pointer-events: none; white-space: nowrap; }
   .lbl::before { content: ""; display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: var(--ink); margin-right: 5px; vertical-align: 1px; }
+  #key .ramp { display: block; height: 8px; margin-top: 6px; }
+  #key .rampl { display: flex; justify-content: space-between; font-size: 10px; color: var(--ink3); margin-top: 2px; } #key .rampl i { font-style: normal; }
   .lbl.pct { font-weight: 700; } .lbl.pct::before { display: none; }
 </style>
 </head>
@@ -69,7 +71,7 @@
 <div id="placeholder">Placeholder styling</div>
 <div id="credits">Satellite: <a href="https://s2maps.eu" target="_blank">Sentinel-2 cloudless - https://s2maps.eu by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2023)</a>, CC BY-NC-SA 4.0 · Paddy: Open-SARice-10 (Zenodo 18905953), CC BY 4.0 · Groundwater: CGWB via INGRES and India Data Portal · Lines: Natural Earth; © OpenStreetMap contributors</div>
 <script type="module">
-import { addLiveGrain } from "./live_grain.js";
+import { addLiveGrain } from "./live_grain.js?v=ramp1";   // ?v: bump when live_grain.js changes, so browsers drop the cached copy
 import { loadFigmaStyles, applyFigmaStyles } from "./figma_styles.js";
 import { initTune } from "./hook_tune.js";
 import { flipToSection } from "./flip.js";   // last slide, -> : the outline flips into the soil section (Krishna, 10 Nov)
@@ -87,6 +89,9 @@ const FW = 1920, FH = 1080, PANEL = 576;     // the frames were composed at 1920
 // Line widths follow Drought Interfaces' ranking: they grow with zoom, linearly from map zoom 5 to 24.
 const grow = (a, b) => ["interpolate", ["linear"], ["zoom"], 5, a, 24, b];
 const WATER = "#1D4C65";           // DI rivers and aqueducts
+// the overdraft ramp (Krishna, 10 Nov: a gradient by stage of extraction): light red at 100% (the limit), the template red mid-way,
+// dark red at 390% (Sunam, the highest). Placeholder stops for Krishna to set.
+const RED_RAMP = { lo: "#FFB0B0", hi: "#7A0000", from: 100, to: 390 };
 const RED = "#E00000";             // red = overdraft only. Krishna, 8 Nov: the template red (as in the A5 storyboard builds; to verify against the deck)
 const GREEN = "#3f8f45";           // paddy dots. Krishna, 8 Nov: deep paddy green
 const STYLE = {
@@ -116,7 +121,8 @@ const LAYERS = {
   area:    { name: "Sangrur–Barnala", read: "Hatched, strongest line: the study area, 11 blocks in 2 districts.",
              hover: p => ["Sangrur and Barnala", "2 districts, 11 blocks", "Study area", "CGWB block outlines (±150 m)"] },
   district:{ name: "Districts", hover: p => [p.district, null, "District", src.ne] },
-  overdraft: { name: "Overdraft", read: "Red dots: the paddy in blocks that pump more than the ground gives back each year (all 11). Each block's % is on the map and on hover.",
+  overdraft: { name: "Overdraft", read: "Red dots: the paddy in blocks that pump more than the ground gives back each year (all 11). The deeper the red, the more a block pumps; each block's % is on the map and on hover."
+               + `<span class="ramp" style="background:linear-gradient(90deg,${RED_RAMP.lo},${RED},${RED_RAMP.hi})"></span><span class="rampl"><i>${RED_RAMP.from}%</i><i>${(RED_RAMP.from + RED_RAMP.to) / 2}%</i><i>${RED_RAMP.to}%</i></span>`,
              hover: p => [p.block, `${p.district} district`, `Pumps <b>${p.stage_pct}%</b> of its yearly extractable groundwater (2025–26)`,
                           `${fmt(p.extraction_ham)} ha·m pumped against ${fmt(p.extractable_ham)} ha·m extractable`,
                           `First assessment on record, ${p.first_year}: ${p.first_stage_pct}%`, `Block · ${p.category}`, src.cgwb] },
@@ -149,7 +155,7 @@ const STEPS = [
   { frame: "f3_punjab", title: "Punjab", on: ["area", "district"],
     fact: "Punjab: 50,362 km², about 1.5% of India's land. It gave 124.14 lakh tonnes of rice to the central pool in 2023–24, about a quarter of all the rice the government bought.",
     src: `Area: state profiles (official figure <span class="verify">to verify</span>). Rice: PIB, KMS 2023–24 (Punjab 124.14 LMT; all India at least 489.15 LMT by 24 May 2024, so Punjab's share is at most 25%).` },
-  { frame: "f4_blocks", title: "Sangrur and Barnala: 11 blocks", on: ["area", "district", "blocks"],
+  { frame: "f4_blocks", title: "Sangrur and Barnala: 11 blocks", on: ["area", "district", "blocks"], labels: "blocks",
     fact: "Paddy covers 80.9% of the ground in the 11 blocks (satellite map, 2021). Official crop statistics: 81.9%.",
     src: "Open-SARice-10 (Zenodo 18905953), 2021; DES land-use statistics via India Data Portal. Each dot's area = share of paddy under it." },
   { frame: "f4_blocks", title: "The water table falls", on: ["area", "district", "blocks", "wells"],
@@ -297,10 +303,12 @@ map.on("render", drawTicks);
 let labels = [];
 function setLabels(kind) {
   labels.forEach(m => m.remove()); labels = [];
+  if (!DATA.blocks) return;   // data not loaded yet (a key pressed during loading)
   const add = (txt, ll, cls) => { const e = document.createElement("div"); e.className = "lbl " + (cls || ""); e.innerHTML = txt;
     labels.push(new maplibregl.Marker({ element: e, anchor: cls === "pct" ? "center" : "left" }).setLngLat(ll).addTo(map)); };
   if (kind === "cities") CITIES.forEach(([n, lo, la]) => add(n, [lo, la]));
   if (kind === "pct") DATA.blocks.features.forEach(f => add(`${f.properties.block}<br>${Math.round(f.properties.stage_pct)}%`, [f.properties.label_lon, f.properties.label_lat], "pct"));
+  if (kind === "blocks") DATA.blocks.features.forEach(f => add(f.properties.block, [f.properties.label_lon, f.properties.label_lat], "pct"));   // Krishna, 10 Nov: names at each block's visual centre
   if (kind === "towns") DATA.towns.features.forEach(f => add(f.properties.name, f.geometry.coordinates));
 }
 
@@ -311,7 +319,7 @@ function render(fly) {
   // the hatch: the belt in frame 2, the study area in frame 3 (Krishna: same hatch for both); none at block scale
   map.setLayoutProperty("area_hatch_f3", "visibility", S.frame === "f3_punjab" ? "visible" : "none");
   // place names now come from the tuning panel's places list (per slide); only the block percentages stay here
-  setLabels(S.labels === "pct" ? "pct" : null);
+  setLabels(["pct", "blocks"].includes(S.labels) ? S.labels : null);
   setRed(S.on.includes("overdraft") ? 1 : 0);
   if (TUNE) { TUNE.apply(step); TUNE.refresh(); }
   applyFigmaStyles(FIG, { map, step, s, dz: dz(), TICK, dots, base: new URL(".", new URL(FIG_URL, location.href)).href })
@@ -392,7 +400,7 @@ function hatchImage() {   // placeholder hatch: thin white diagonals, 8 px apart
 map.on("load", async () => {
   map.addImage("hatch", hatchImage());
   dots = addLiveGrain(map, { before: "india_dim", blocksSource: "blocks", shareTiles: new URL("../tiles/paddy_share/{z}/{x}/{y}.png", location.href).href.replace(/%7B/g, "{").replace(/%7D/g, "}"),
-                             green: GREEN, redColour: RED, rmax: 1.9, pitch: 4, scale: () => s, dz });
+                             green: GREEN, redColour: RED, redRamp: RED_RAMP, rmax: 1.9, pitch: 4, scale: () => s, dz });
   const grain = dots;   // the export modes wait for grain.op === 1 (always, now)
   if (!Q.has("placeholder")) FIG = await loadFigmaStyles(FIG_URL);
   if (FIG) document.getElementById("placeholder").textContent = "Figma styles: " + FIG.files.length + " files";
