@@ -83,7 +83,10 @@
   #setup.off { opacity:0; pointer-events:none; }
   #setup .card { position:absolute; left:calc(30 * var(--u)); top:calc(var(--oy) + 30 * var(--u)); width:calc(900 * var(--u)); }
   #sMap { position:absolute; left:calc(1010 * var(--u)); top:calc(var(--oy) + 110 * var(--u)); height:calc(860 * var(--u)); width:auto; }
-  #sMap path { stroke:#fff; stroke-width:2; cursor:pointer; transition:fill .25s; }
+  #sMap path { stroke:#000; stroke-width:1.5; stroke-linejoin:round; cursor:pointer; transition:fill .25s; }
+  #sMap text.s { fill:#fff; stroke:none; }
+  #sMap path.selO { animation:selPulse .35s ease-out; }   /* a short pulse when a block is chosen */
+  @keyframes selPulse { from { stroke-width:9; } to { stroke-width:4; } }
   #sMap path:hover { stroke:#000; stroke-width:2.5; }
   #sMap text { font-family:inherit; text-anchor:middle; pointer-events:none; fill:#000; paint-order:stroke; stroke:#fff; stroke-width:3.5px; stroke-linejoin:round; }
   #sMapKey .ramp { display:block; width:calc(300 * var(--u)); height:calc(8 * var(--u)); margin:calc(6 * var(--u)) 0 calc(3 * var(--u));
@@ -119,7 +122,7 @@
   <div id="sRead"></div>
   <button id="sGo">Run the simulator →</button>
   <svg id="sMap" viewBox="-6 -6 612 655" aria-label="The 11 blocks; click one to place the farm"></svg>
-  <div id="sMapKey"><span class="ramp"></span><span class="rampl"><i>100%</i><i>245%</i><i>390%</i></span>The 11 blocks, with the share of their safe limit they pump (CGWB 2025–26), coloured as in the hook. Outlined = the farm's block. ↑ ↓ or click to choose.</div>
+  <div id="sMapKey"><span class="ramp"></span><span class="rampl"><i>100%</i><i>245%</i><i>390%</i></span>The 11 blocks, with the share of their safe limit they pump (CGWB 2025–26), coloured as in the hook. Solid, heavy outline = the farm's block. ↑ ↓ or click to choose.</div>
 </section>
 
 <div id="card" class="abs">
@@ -244,9 +247,12 @@ function renderSetup(b, stage) {
   // (one dot per 4 screen px, as there; uniform here, at the belt's 81% paddy share). The farm's block is outlined in black.
   const U = 4 / (860 / 655), R = 1.9 * Math.sqrt(0.81) / (860 / 655);           // 4 px pitch and dot radius, in map units
   let h = `<defs>${BLOCKS.map((bb, i) => `<pattern id="dp${i}" patternUnits="userSpaceOnUse" width="${U}" height="${U}"><circle cx="${U / 2}" cy="${U / 2}" r="${R}" fill="${redRamp(stageNow(bb))}"/></pattern>`).join("")}</defs>`;
-  h += BLOCKS.map((bb, i) => `<path d="${SHAPES[i][0]}" fill="url(#dp${i})" data-i="${i}"><title>${bb[0]}: ${Math.round(stageNow(bb))}%</title></path>`).join("");
-  h += `<path d="${SHAPES[sel][0]}" fill="none" stroke="#000" stroke-width="4" style="pointer-events:none"/>`;
-  h += BLOCKS.map((bb, i) => `<text x="${SHAPES[i][1]}" y="${SHAPES[i][2] - 4}" class="n">${bb[0]}</text><text x="${SHAPES[i][1]}" y="${SHAPES[i][2] + 14}" class="v">${Math.round(stageNow(bb))}%</text>`).join("");
+  // black outlines (Krishna, 11 Nov); the farm's block is highlighted: solid in its own ramp colour, a heavy outline, white labels
+  h += BLOCKS.map((bb, i) => `<path d="${SHAPES[i][0]}" fill="${i === sel ? redRamp(stageNow(bb)) : `url(#dp${i})`}" data-i="${i}"><title>${bb[0]}: ${Math.round(stageNow(bb))}%</title></path>`).join("");
+  const pulse = renderSetup.last !== undefined && renderSetup.last !== sel; renderSetup.last = sel;   // pulse only when the choice changes
+  h += `<path class="${pulse ? "selO" : ""}" d="${SHAPES[sel][0]}" fill="none" style="pointer-events:none;stroke:#000;stroke-width:4"/>`;
+  h += BLOCKS.map((bb, i) => { const s = i === sel ? " s" : "";
+    return `<text x="${SHAPES[i][1]}" y="${SHAPES[i][2] - 4}" class="n${s}">${bb[0]}</text><text x="${SHAPES[i][1]}" y="${SHAPES[i][2] + 14}" class="v${s}">${Math.round(stageNow(bb))}%</text>`; }).join("");
   $("sMap").innerHTML = h;
   document.querySelectorAll("#sMap path[data-i]").forEach(el => el.onclick = () => { sel = +el.dataset.i; render(); });
   const safeM3 = b[3] * HAM_M3 / b[2] * acres * ACRE_HA;
