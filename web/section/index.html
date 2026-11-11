@@ -51,8 +51,8 @@
 <div id="card">
   <div class="kicker">Under the 11 blocks · west to east</div>
   <div class="title">From 6 m to 40 m below ground</div>
-  <div class="body">Fifteen monitoring wells, at least one in every block, drawn on one line. Each drops to its first reading, then in red to its last. Below the water table the ground is full of water: that is the aquifer. Above it lies the ground the pumps have drained.</div>
-  <div class="source">CGWB monitoring wells via India Data Portal; pre-monsoon depth to water. Water table = belt median, 3-year rolling (1985: 3 wells; 2023: 14). Wells chosen by rule: the longest record in each block, plus wells read for 18+ years. Simplified: real alluvium alternates sand and clay; one saturated zone is shown.</div>
+  <div class="body">Fifteen monitoring wells, at least one in every block, drawn on one line. Each drops to its first reading, then in red to its last. Below the water table the ground is full of water, and its sand layers are the aquifer. Above it lies the ground the pumps have drained.</div>
+  <div class="source">CGWB monitoring wells via India Data Portal; pre-monsoon depth to water. Water table = belt median, 3-year rolling (1985: 3 wells; 2023: 14). Wells chosen by rule: the longest record in each block, plus wells read for 18+ years. Layers: CGWB aquifer mapping, Barnala and Sangrur districts (simplified).</div>
 </div>
 
 <div id="water"><div class="num" id="wnum">40.0 m</div><div class="lab">Water below ground · 2023</div><div class="src">Median of the belt's CGWB monitoring wells, pre-monsoon</div></div>
@@ -73,24 +73,30 @@ let h = "";
 // bands: drained since 1985 (lightest); saturated today = photo 1 (Krishna, 10 Nov): a real cut soil face (US National Archives,
 // public domain; img/soil_nara_286175.jpg, cropped from img_src/), scaled to the band's height and repeated across, every other copy
 // mirrored so the seams don't show; a white wash keeps the wells and labels readable. Illustrative: it is not this site's ground.
-// Layers above the water table (Krishna's picks S3, A2, C2, K1: ISRIC monoliths, CC BY-SA 3.0; crop_soil.py). The materials are
-// documented for the belt (sand, silt and clay with kankar; clay beds dominate); the ORDER AND DEPTHS BELOW ARE ILLUSTRATIVE until
-// they are set from a borehole log in CGWB's Sangrur aquifer report. Each texture is tiled at one scale (tile TH px tall), every
-// other copy mirrored. Wash: paler above the 2023 water table (dry ground), stronger photo below it (wet).
+// Layers (textures: Krishna's picks S3, A2, C2, K1, ISRIC monoliths, CC BY-SA 3.0; crop_soil.py). ORDER AND DEPTHS after CGWB's
+// lithological cross-sections (Aquifer Mapping reports, Barnala and Sangrur districts, archived copies in Data_Verification/
+// 14_lithology), read off the figures' depth axes: Barnala Tajoke-Barnala (about +-2 m) and Sangrur B-B' (about +-7 m) agree on
+// clay at the surface to ~8 m, sand ~8-38 m, clay ~38-49 m (Sangrur to ~57), sand below. Simplified; the sections are interpolated
+// models from a few boreholes. Kankar: "often intercepts" the sand (report text) but no depth is given, so its band is schematic.
+// Each texture is tiled at one scale (TH px tall), every other copy mirrored. Wash: paler above the 2023 water table (dry), less below.
 const TEX = { silt: { src: "img/layer_silt_PE-005.jpg", w: 600, h: 745 }, sand: { src: "img/layer_sand_BR-020.jpg", w: 600, h: 700 },
               clay: { src: "img/layer_clay_IT-011.jpg", w: 600, h: 683 }, kankar: { src: "img/layer_kankar_IN-011.jpg", w: 600, h: 745 },
               nara: { src: "img/soil_nara_286175.jpg", w: 592, h: 800 } };
 const TH = 230, DRY_WASH = 0.5, WET_WASH = 0.35;
 const LAYERS = [
-  { from: 0,     to: 12,    tex: "silt",   label: "Silt and loam" },
-  { from: 12,    to: 17,    tex: "kankar", label: "Silt with kankar (lime nodules)" },
-  { from: 17,    to: 26,    tex: "sand",   label: "Fine sand" },
-  { from: 26,    to: 31,    tex: "clay",   label: "Clay" },
-  { from: 31,    to: t23.m, tex: "sand",   label: "Sand" },
-  { from: t23.m, to: MAXD,  tex: "nara",   label: "", fit: true },   // the saturated band: photo 1, fitted to the band's height
+  { from: 0,   to: 1.5, tex: "silt",   label: "Topsoil: loamy sand" },
+  { from: 1.5, to: 8,   tex: "clay",   label: "Sandy clay" },
+  { from: 8,   to: 20,  tex: "sand",   label: "Fine to medium sand: the upper aquifer" },
+  { from: 20,  to: 22,  tex: "kankar", label: "Kankar (lime nodules), depth schematic" },
+  { from: 22,  to: 38,  tex: "sand",   label: "" },
+  { from: 38,  to: 49,  tex: "clay",   label: "Clay" },
+  { from: 49,  to: MAXD, tex: "sand",  label: "Sand: the aquifer below the clay" },
 ];
+// split any layer the 2023 water table cuts through, so the part below it gets the wet wash
+const PARTS = LAYERS.flatMap(L => L.from < t23.m && L.to > t23.m
+  ? [{ ...L, to: t23.m }, { ...L, from: t23.m, label: "" }] : [L]);
 let defs = "", bands = "";
-LAYERS.forEach((L, i) => {
+PARTS.forEach((L, i) => {
   const T = TEX[L.tex], y0 = y(L.from), y1 = y(L.to), th = L.fit ? y1 - y0 : TH, tw = th * T.w / T.h, wet = L.from >= t23.m;
   defs += `<pattern id="tex${i}" patternUnits="userSpaceOnUse" x="${X0}" y="${y0}" width="${2 * tw}" height="${th}">
       <image href="${T.src}" x="0" y="0" width="${tw}" height="${th}" preserveAspectRatio="none"/>
@@ -113,8 +119,10 @@ h += `<line x1="${X0}" x2="${X1}" y1="${y(PUMP)}" y2="${y(PUMP)}" stroke="#000" 
       <text x="${RX}" y="${y(t23.m) + 4.5}" class="lab"><tspan font-weight="700">Water table 2023: ${t23.m} m</tspan></text>`;
 // zone labels
 const zy1 = (y(t85.m) + y(t23.m)) / 2, zy2 = (y(t23.m) + B) / 2;
-h += `<text x="${RX}" y="${zy1}" class="zone">DRAINED SINCE 1985</text><text x="${RX}" y="${zy1 + 20}" class="lab">${r(t23.m - t85.m)} m of ground that was full of water</text>
-      <text x="${RX}" y="${zy2}" class="zone">SATURATED: THE AQUIFER</text><text x="${RX}" y="${zy2 + 20}" class="lab">water fills the gaps between grains</text>`;
+h += `<text x="${RX}" y="${zy1}" class="zone">DRAINED SINCE 1985</text><text x="${RX}" y="${zy1 + 20}" class="lab">${r(t23.m - t85.m)} m of ground that was full of water,</text>
+      <text x="${RX}" y="${zy1 + 38}" class="lab">most of the upper sand aquifer</text>
+      <text x="${RX}" y="${zy2}" class="zone">SATURATED</text><text x="${RX}" y="${zy2 + 20}" class="lab">clay holds water but gives little;</text>
+      <text x="${RX}" y="${zy2 + 38}" class="lab">the sand below it is the aquifer</text>`;
 // the 15 wells
 const ws = sec.wells.map(w => ({ ...w, X: x(w.lon) }));
 for (let pass = 0; pass < 40; pass++)
@@ -146,8 +154,8 @@ h += `<line x1="38" x2="38" y1="${ky}" y2="${ky + 20}" stroke="#000" stroke-widt
       <text x="56" y="${ky + 24.5}" class="key">First reading</text><text x="56" y="${ky + 46.5}" class="key">Last reading. Red = how far the water fell at that well</text>
       <text x="520" y="${ky + 24.5}" class="key">Wells first read in 2013–18 start deep because the water was already deep there, not because their blocks fell less.</text>
       <text x="520" y="${ky + 46.5}" class="key">Position = longitude, west to east; close wells nudged apart (order kept). Excluded: one Sehna well with an impossible first reading (100.0 m).</text>
-      <text x="520" y="${ky + 68.5}" class="key">Ground: photographs of real soils, not this site's. Materials as documented for the belt (sand, silt, clay, kankar); their order and depths are illustrative.</text>
-      <text x="520" y="${ky + 90.5}" class="key">Photos: ISRIC World Soil Reference Collection PE-005, BR-020, IT-011, IN-011 (CC BY-SA 3.0); soil cut-away, Missouri (US National Archives 286175, public domain).</text>`;
+      <text x="520" y="${ky + 68.5}" class="key">Layers after CGWB's lithological cross-sections, Barnala and Sangrur aquifer mapping reports (simplified; kankar depth schematic). Textures: photographs of real soils, not this site's.</text>
+      <text x="520" y="${ky + 90.5}" class="key">Photos: ISRIC World Soil Reference Collection PE-005, BR-020, IT-011, IN-011 (CC BY-SA 3.0).</text>`;
 document.getElementById("s").innerHTML = h;
 document.title = "Soil section";
 requestAnimationFrame(() => document.body.classList.add("in"));
