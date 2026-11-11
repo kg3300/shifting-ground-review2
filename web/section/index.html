@@ -186,9 +186,9 @@ if (INTRO) {
   svg.innerHTML = h;
   const wipe = svg.querySelector("#wipeR"), rects = [...svg.querySelectorAll(".wcr")];
   [wipe, ...rects].forEach(el => el.setAttribute("height", 0));
-  await tween(1100, e => wipe.setAttribute("height", e * +wipe.dataset.h));                         // layers wipe down
+  await tween(1500, e => wipe.setAttribute("height", e * +wipe.dataset.h));                         // layers wipe down
   await Promise.all(rects.map((el, i) => new Promise(res => setTimeout(() =>                     // wells drop, west to east
-    tween(450, e => el.setAttribute("height", e * +el.dataset.h)).then(res), i * 90))));
+    tween(600, e => el.setAttribute("height", e * +el.dataset.h)).then(res), i * 130))));
   document.body.classList.add("show");                                                           // card, labels, key
 } else {
   svg.innerHTML = h;
