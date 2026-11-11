@@ -1,0 +1,12 @@
+{
+ "mode": "dots",
+ "spacing": 1,
+ "dot": 0.56,
+ "gamma": 0.6,
+ "cut": 0,
+ "plant": 2,
+ "contrast": 1.7,
+ "bright": 1,
+ "pond": 0.8,
+ "water": "#55748b"
+}
