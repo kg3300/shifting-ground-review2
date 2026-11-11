@@ -47,7 +47,7 @@
   #ticks span { position:absolute; transform:translateX(-50%); font-size:calc(13 * var(--u)); color:var(--grey); white-space:nowrap; }
   #ticks span.lim { color:#000; font-weight:700; }
   /* the one control */
-  #crop { left:calc(30 * var(--u)); top:calc(var(--oy) + 918 * var(--u)); width:calc(1600 * var(--u)); }
+  #crop { left:calc(160 * var(--u)); top:calc(var(--oy) + 918 * var(--u)); width:calc(1600 * var(--u)); }   /* centred on the page (Krishna, 11 Nov) */
   #crop .ends { display:flex; justify-content:space-between; font-size:calc(15 * var(--u)); font-weight:700; letter-spacing:.1em; text-transform:uppercase; }
   #mix { width:100%; margin:calc(10 * var(--u)) 0 0; -webkit-appearance:none; appearance:none; height:calc(4 * var(--u)); background:#000; outline:none; }
   #mix::-webkit-slider-thumb { -webkit-appearance:none; width:calc(26 * var(--u)); height:calc(26 * var(--u)); border-radius:50%; background:#000; border:calc(4 * var(--u)) solid #fff; box-shadow:0 0 0 calc(1.5 * var(--u)) #000; cursor:grab; }
@@ -85,7 +85,11 @@
   #sMap { position:absolute; left:calc(1010 * var(--u)); top:calc(var(--oy) + 110 * var(--u)); height:calc(860 * var(--u)); width:auto; }
   #sMap path { stroke:#fff; stroke-width:2; cursor:pointer; transition:fill .25s; }
   #sMap path:hover { stroke:#000; stroke-width:2.5; }
-  #sMap text { font-family:inherit; text-anchor:middle; pointer-events:none; }
+  #sMap text { font-family:inherit; text-anchor:middle; pointer-events:none; fill:#000; paint-order:stroke; stroke:#fff; stroke-width:3.5px; stroke-linejoin:round; }
+  #sMapKey .ramp { display:block; width:calc(300 * var(--u)); height:calc(8 * var(--u)); margin:calc(6 * var(--u)) 0 calc(3 * var(--u));
+                   background:linear-gradient(90deg,#e3242b,#c8102e,#4a1410); }
+  #sMapKey .rampl { display:flex; justify-content:space-between; width:calc(300 * var(--u)); font-size:calc(11 * var(--u)); margin-bottom:calc(6 * var(--u)); }
+  #sMapKey .rampl i { font-style:normal; }
   #sMap .n { font-size:15px; font-weight:700; } #sMap .v { font-size:14px; font-variant-numeric:tabular-nums; }
   #sMapKey { position:absolute; left:calc(1010 * var(--u)); top:calc(var(--oy) + 990 * var(--u)); width:calc(820 * var(--u));
              font-size:calc(13 * var(--u)); color:var(--grey); }
@@ -115,7 +119,7 @@
   <div id="sRead"></div>
   <button id="sGo">Run the simulator →</button>
   <svg id="sMap" viewBox="-6 -6 612 655" aria-label="The 11 blocks; click one to place the farm"></svg>
-  <div id="sMapKey">The 11 blocks, with the share of their safe limit they pump (CGWB 2025–26). Darker = further over. Black = the farm's block. ↑ ↓ or click to choose.</div>
+  <div id="sMapKey"><span class="ramp"></span><span class="rampl"><i>100%</i><i>245%</i><i>390%</i></span>The 11 blocks, with the share of their safe limit they pump (CGWB 2025–26), coloured as in the hook. Outlined = the farm's block. ↑ ↓ or click to choose.</div>
 </section>
 
 <div id="card" class="abs">
@@ -228,12 +232,21 @@ function render() {
 }
 
 // ---------- part 1: choose the farm ----------
+// the hook's overdraft ramp (hook_tour/index.html RED_RAMP): clear red at 100%, the presentation red mid-way, dried-blood brown at 390%
+const RED_RAMP = { lo: "#e3242b", mid: "#c8102e", hi: "#4a1410", from: 100, to: 390 };
+function redRamp(v) { const t = Math.max(0, Math.min(1, (v - RED_RAMP.from) / (RED_RAMP.to - RED_RAMP.from))), h = x => [1, 3, 5].map(i => parseInt(x.slice(i, i + 2), 16));
+  const [p, q, u] = t < 0.5 ? [h(RED_RAMP.lo), h(RED_RAMP.mid), t * 2] : [h(RED_RAMP.mid), h(RED_RAMP.hi), t * 2 - 1];
+  return `rgb(${p.map((c, k) => Math.round(c + (q[k] - c) * u)).join(",")})`; }
 function renderSetup(b, stage) {
   const acres = +$("land").value;
   $("sAcres").textContent = acres; $("sUnit").textContent = acres === 1 ? "acre" : "acres"; $("sLand").value = acres;
-  let h = BLOCKS.map((bb, i) => `<path d="${SHAPES[i][0]}" fill="${i === sel ? "#000" : shade(stageNow(bb))}" data-i="${i}"><title>${bb[0]}: ${Math.round(stageNow(bb))}%</title></path>`).join("");
-  h += BLOCKS.map((bb, i) => { const light = i === sel || stageNow(bb) > 250 ? "#fff" : "#000";
-    return `<text x="${SHAPES[i][1]}" y="${SHAPES[i][2] - 4}" class="n" fill="${light}">${bb[0]}</text><text x="${SHAPES[i][1]}" y="${SHAPES[i][2] + 14}" class="v" fill="${light}">${Math.round(stageNow(bb))}%</text>`; }).join("");
+  // the hook's last slide (Krishna, 11 Nov): each block in the hook's red ramp by stage of extraction, drawn as the hook's dot grain
+  // (one dot per 4 screen px, as there; uniform here, at the belt's 81% paddy share). The farm's block is outlined in black.
+  const U = 4 / (860 / 655), R = 1.9 * Math.sqrt(0.81) / (860 / 655);           // 4 px pitch and dot radius, in map units
+  let h = `<defs>${BLOCKS.map((bb, i) => `<pattern id="dp${i}" patternUnits="userSpaceOnUse" width="${U}" height="${U}"><circle cx="${U / 2}" cy="${U / 2}" r="${R}" fill="${redRamp(stageNow(bb))}"/></pattern>`).join("")}</defs>`;
+  h += BLOCKS.map((bb, i) => `<path d="${SHAPES[i][0]}" fill="url(#dp${i})" data-i="${i}"><title>${bb[0]}: ${Math.round(stageNow(bb))}%</title></path>`).join("");
+  h += `<path d="${SHAPES[sel][0]}" fill="none" stroke="#000" stroke-width="4" style="pointer-events:none"/>`;
+  h += BLOCKS.map((bb, i) => `<text x="${SHAPES[i][1]}" y="${SHAPES[i][2] - 4}" class="n">${bb[0]}</text><text x="${SHAPES[i][1]}" y="${SHAPES[i][2] + 14}" class="v">${Math.round(stageNow(bb))}%</text>`).join("");
   $("sMap").innerHTML = h;
   document.querySelectorAll("#sMap path[data-i]").forEach(el => el.onclick = () => { sel = +el.dataset.i; render(); });
   const safeM3 = b[3] * HAM_M3 / b[2] * acres * ACRE_HA;
@@ -301,15 +314,17 @@ function drawAxo(count) {
   const d = lg.getImageData(0, 0, cols, rows).data, x = cv.getContext("2d");
   x.setTransform(dpr, 0, 0, dpr, 0, 0); x.fillStyle = "#fff"; x.fillRect(0, 0, W, H); x.fillStyle = "#000";
   const gx = W / cols, gy = H / rows, rmax = AXO_SET.dot * gx;
-  for (let jj = 0; jj < rows; jj++) {
-    x.beginPath();
-    for (let ii = 0; ii < cols; ii++) {
-      const dk = 1 - d[(jj * cols + ii) * 4] / 255; if (dk < AXO_SET.cut) continue;
-      const r = rmax * Math.pow(dk, AXO_SET.gamma), px = (ii + 0.5) * gx, py = (jj + 0.5) * gy;
-      x.moveTo(px + r, py); x.arc(px, py, r, 0, 6.2832);
-    }
-    x.fill();
+  // dots are black, except where the scene has colour (only the paddy water can: its colour is set in the T panel). Those cells
+  // are dotted in the water colour itself, sized by its darkness (but never smaller than half size, so a pale colour still shows).
+  const ink = new Path2D(), wet = new Path2D();
+  for (let jj = 0; jj < rows; jj++) for (let ii = 0; ii < cols; ii++) {
+    const o = (jj * cols + ii) * 4, R0 = d[o], G0 = d[o + 1], B0 = d[o + 2];
+    const coloured = Math.max(R0, G0, B0) - Math.min(R0, G0, B0) > 14;
+    const dk = 1 - (0.299 * R0 + 0.587 * G0 + 0.114 * B0) / 255; if (dk < AXO_SET.cut && !coloured) continue;
+    const r = rmax * (coloured ? Math.max(0.5, Math.pow(dk, AXO_SET.gamma)) : Math.pow(dk, AXO_SET.gamma)), px = (ii + 0.5) * gx, py = (jj + 0.5) * gy;
+    const p = coloured ? wet : ink; p.moveTo(px + r, py); p.arc(px, py, r, 0, 6.2832);
   }
+  x.fill(ink); x.fillStyle = AXO_SET.water; x.fill(wet);
 }
 rice.onload = maize.onload = () => { axo.count = -1; render(); };
 addEventListener("resize", () => { axo.count = -1; render(); });
