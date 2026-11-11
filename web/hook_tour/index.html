@@ -27,7 +27,8 @@
   /* left text panel: 576 of 1920 px (Krishna, 8 Nov), scaled with the frame */
   #panel { position: absolute; top: 0; bottom: 0; background: var(--panel); display: flex; flex-direction: column;
            padding: calc(30 * var(--u)) calc(30 * var(--u)) calc(24 * var(--u)); box-sizing: border-box; z-index: 2; }
-  #count { color: var(--red); font-weight: 700; font-size: calc(15 * var(--u)); letter-spacing: .1em; text-transform: uppercase; }
+  #count { color: var(--ink); font-weight: 700; font-size: calc(15 * var(--u)); letter-spacing: .1em; text-transform: uppercase; }
+  #title.cover { font-size: calc(58 * var(--u)); color: var(--red); line-height: 1.05; }   /* slide 1: the project title, bigger and red (Krishna, 11 Nov) */
   #title { margin: calc(8 * var(--u)) 0 calc(12 * var(--u)); font-size: calc(34 * var(--u)); font-weight: 800; font-style: italic;
            line-height: 1.15; text-transform: uppercase; }
   /* Krishna, 11 Nov: one size (20) for all text under the title; legend above the key; sources just above the arrows */
@@ -424,7 +425,7 @@ function render(fly) {
   if (fly) { if (!atStop()) map.flyTo({ ...c, duration: 2600, essential: true }); } else map.jumpTo(c);
   // panel
   document.getElementById("count").textContent = `Step ${step + 1} of ${STEPS.length}`;
-  document.getElementById("title").textContent = S.title;
+  document.getElementById("title").textContent = S.title; document.getElementById("title").classList.toggle("cover", step === 0);
   document.getElementById("brief").textContent = S.brief || "";
   document.getElementById("sub").textContent = S.sub || "";
   document.getElementById("fact").textContent = S.fact;

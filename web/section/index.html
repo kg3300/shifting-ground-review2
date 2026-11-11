@@ -22,7 +22,9 @@
   /* intro (from the hook's flip): card, indicator, labels and key fade in last */
   #card, #water, #s .fade { transition:opacity .6s ease; }
   body.intro:not(.show) #card, body.intro:not(.show) #water, body.intro:not(.show) #s .fade { opacity:0; }
-  #s { position:fixed; inset:0; width:100vw; height:100vh; display:block; }
+  #s { position:fixed; inset:0; width:100vw; height:100vh; display:block; overflow:visible; }
+  /* outro (Krishna, 11 Nov): -> plays the build backwards; card, indicator, labels and key fade first */
+  body.outro #card, body.outro #water, body.outro #s .fade, body.outro #icons { opacity:0; transition:opacity .5s ease; }
   /* the card, same place and type as the collage and Prover cards */
   #card { position:fixed; left:calc(30 * var(--u)); top:calc(var(--oy) + 30 * var(--u)); width:calc(1000 * var(--u)); }
   .kicker { color:var(--red); font-weight:700; font-size:calc(15 * var(--u)); letter-spacing:.1em; text-transform:uppercase; }
@@ -62,7 +64,7 @@
 <div id="water"><div class="num" id="wnum">40.0 m</div><div class="lab">Water below ground · 2023</div><div class="src">Median of the belt's CGWB monitoring wells, pre-monsoon</div></div>
 
 <script type="module">
-import { SECTION, wellXs, WELL_ICON } from "./geometry.js";
+import { SECTION, wellXs, WELL_ICON, frameToScreen } from "./geometry.js";
 const { X0, X1, G } = SECTION;            // shared with the hook's flip (hook_tour/flip.js), so its outline lands on this ground line
 const PX_PER_M = 9.5, MAXD = 60, PUMP = 9, RX = 1530;
 // ?from=hook: arrived from the hook's flip. Start from the bare ground line (where the flip left it) and build the section:
@@ -202,9 +204,27 @@ let leaving = false;
 addEventListener("keydown", e => {
   const next = ["ArrowRight", "PageDown", " "].includes(e.key), back = ["ArrowLeft", "PageUp"].includes(e.key);
   if (leaving || !(next || back)) return;
-  e.preventDefault(); leaving = true; document.body.style.transition = ""; document.body.classList.remove("in");
-  setTimeout(() => { location.href = next ? "../collage/index.html" : "../hook_tour/index.html?step=6"; }, 500);
+  e.preventDefault(); leaving = true;
+  if (next) { toCollage(); return; }
+  document.body.style.transition = ""; document.body.classList.remove("in");
+  setTimeout(() => { location.href = "../hook_tour/index.html?step=6"; }, 500);
 });
+// -> into the collage (Krishna, 11 Nov): the build runs backwards (labels fade, wells rise back into the ground line east to west,
+// the layers wipe up), so only the ground line is left; it then slides down to the collage's through line (y 913 of the frame),
+// stretches to the screen's edges and thins to its weight, and the collage opens on that same line (?from=section).
+async function toCollage() {
+  const body = document.body, ground = svg.querySelector("#ground");
+  body.classList.add("outro");
+  const rects = [...svg.querySelectorAll(".wcr")].reverse(), wipe = svg.querySelector("#wipeR");
+  await Promise.all(rects.map((el, i) => new Promise(res => setTimeout(() => {
+    const h0 = +el.getAttribute("height"); tween(500, e => el.setAttribute("height", h0 * (1 - e))).then(res); }, i * 70))));
+  if (wipe) { const h0 = +wipe.getAttribute("height"); await tween(1100, e => wipe.setAttribute("height", h0 * (1 - e))); }
+  const F = frameToScreen(), L = -F.x(0) / F.s - 4, R = (innerWidth - F.x(0)) / F.s + 4;   // the screen's edges, in frame px
+  const W0 = SECTION.GROUND_W, W1 = Math.max(1 / F.s, 1.5);                                // the collage line: max(1 px, 1.5 frame px)
+  await tween(1300, e => { ground.setAttribute("x1", X0 + (L - X0) * e); ground.setAttribute("x2", X1 + (R - X1) * e);
+    const yy = G + (913 - G) * e; ground.setAttribute("y1", yy); ground.setAttribute("y2", yy); ground.setAttribute("stroke-width", W0 + (W1 - W0) * e); });
+  location.href = "../collage/index.html?from=section";
+}
 </script>
 </body>
 </html>

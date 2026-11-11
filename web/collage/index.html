@@ -48,12 +48,17 @@
   #tune pre { white-space:pre-wrap; word-break:break-all; font-size:11px; color:#555; margin:8px 0 0; }
   #tune button { font:inherit; margin-top:6px; border:1px solid #000; background:#fff; padding:3px 8px; cursor:pointer; }
   .bare #card, .bare #water { display:none; }
+  /* arriving from the soil section (?from=section, Krishna 11 Nov): only the through line shows, on white; the collage fades in around it */
+  #from { position:fixed; inset:0; background:#fff; z-index:20; pointer-events:none; transition:opacity 1.2s ease; }
+  #from i { position:absolute; left:0; right:0; top:calc(var(--oy) + 913 * var(--u)); height:max(1px, calc(1.5 * var(--u))); background:#000; transform:translateY(-50%); }
+  #from.off { opacity:0; }
   #hint { display:none; }   /* hidden for the talk (Krishna, 10 Nov); the controls are in the code comment at the top */
   #hint { position:fixed; left:calc(77 * var(--u)); bottom:calc(var(--oy) + 30 * var(--u)); font-size:11px; color:#9a9a9a; transition:opacity .6s; }
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
+<script>if (new URLSearchParams(location.search).get("from") === "section") document.write('<div id="from"><i></i></div>');</script>
 <div id="card"><div class="kicker"></div><div class="title"></div><div class="body"></div><div class="today"></div><div class="source"></div></div>
 <div id="water"><div class="num">–</div><div class="lab">Water below ground</div><div class="src"></div></div>
 <div id="tune"><b>Tuning (T to hide)</b><div id="sliders"></div><pre id="vals"></pre><button id="reset">Back to defaults</button></div>
@@ -406,6 +411,10 @@ addEventListener("keydown", e => {
       document.body.style.transition = "opacity .45s"; document.body.style.opacity = 0;
       setTimeout(() => location.href = "../prover/index.html", 450); return;
     }
+    if (BACK.includes(e.key) && !anim && !vel && Math.abs(cxW - STOPS[0].x) < 1) {             // at the first stop, back: the soil section
+      document.body.style.transition = "opacity .45s"; document.body.style.opacity = 0;
+      setTimeout(() => location.href = "../section/index.html", 450); return;
+    }
     anim = null; target = cxW; hold = FWD.includes(e.key) ? 1 : -1; dirty = true;
     document.getElementById("hint").style.opacity = 0;
   } else if (["PageDown", " "].includes(e.key)) { e.preventDefault(); const ni = nextStop(1); if (ni >= 0) go(ni); }
@@ -450,7 +459,9 @@ const show = () => { document.getElementById("vals").textContent = JSON.stringif
 
 load().then(n => {
   cxW = target = STOPS[location.hash === "#end" ? STOPS.length - 1 : 0].x; layout(); buildPanel(); requestAnimationFrame(frame);   // #end: coming back from the Prover
-  document.fonts.load(`600 32px Inter`).then(() => { dirty = true; });   // redraw the canvas years once Inter has loaded (Krishna, 11 Nov: one face)
+  document.fonts.load(`600 32px Inter`).then(() => { dirty = true; });
+  const from = document.getElementById("from");                           // from the section: let the collage come in around the line
+  if (from) requestAnimationFrame(() => setTimeout(() => { from.classList.add("off"); setTimeout(() => from.remove(), 1300); }, 250));   // redraw the canvas years once Inter has loaded (Krishna, 11 Nov: one face)
   document.getElementById("water").querySelector(".src").textContent = "Median of the belt's CGWB monitoring wells, pre-monsoon";
   // test hook: the hidden browser pane pauses requestAnimationFrame, so tests step frames by hand
   window.COLLAGE = { images: n, go, frame: t => { dirty = true; frame(t); },
