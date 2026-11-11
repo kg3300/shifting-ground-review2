@@ -61,9 +61,9 @@
 <div id="water"><div class="num" id="wnum">40.0 m</div><div class="lab">Water below ground · 2023</div><div class="src">Median of the belt's CGWB monitoring wells, pre-monsoon</div></div>
 
 <script type="module">
-import { SECTION } from "./geometry.js";
+import { SECTION, wellXs, WELL_ICON } from "./geometry.js";
 const { X0, X1, G } = SECTION;            // shared with the hook's flip (hook_tour/flip.js), so its outline lands on this ground line
-const PX_PER_M = 9.5, MAXD = 60, PUMP = 9, RX = 1530, MINGAP = 62;
+const PX_PER_M = 9.5, MAXD = 60, PUMP = 9, RX = 1530;
 // ?from=hook: arrived from the hook's flip. Start from the bare ground line (where the flip left it) and build the section:
 // the layers wipe down, the wells drop in west to east, then the card, labels and key fade in (Krishna, 10 Nov).
 const INTRO = new URLSearchParams(location.search).get("from") === "hook";
@@ -137,9 +137,8 @@ h += `<text x="${RX}" y="${zy1}" class="zone">DRAINED SINCE 1985</text><text x="
       <text x="${RX}" y="${zy2}" class="zone">SATURATED</text><text x="${RX}" y="${zy2 + 20}" class="lab">clay holds water but gives little;</text>
       <text x="${RX}" y="${zy2 + 38}" class="lab">the sand below it is the aquifer</text></g>`;
 // the 15 wells
-const ws = sec.wells.map(w => ({ ...w, X: x(w.lon) }));
-for (let pass = 0; pass < 40; pass++)
-  for (let i = 1; i < ws.length; i++) { const d = ws[i].X - ws[i - 1].X; if (d < MINGAP) { const k = (MINGAP - d) / 2; ws[i - 1].X -= k; ws[i].X += k; } }
+const XS = wellXs(sec.wells, W, E), ws = sec.wells.map((w, i) => ({ ...w, X: XS[i] }));   // shared with the flip
+const icons = ws.map(w => `<circle cx="${r(w.X)}" cy="${G}" r="${WELL_ICON.r}" fill="#000" stroke="#fff" stroke-width="${WELL_ICON.stroke}"/>`).join("");
 const nameOf = w => w.name.replace(/-\s*P[Zz].*$/, "").replace(/ M$/, "").trim();
 ws.forEach((w, i) => { w.NY = y(w.d1) + 24; const p = ws[i - 1]; if (p && w.X - p.X < 90 && Math.abs(w.NY - p.NY) < 34) w.NY = p.NY + 34; });
 let wellClips = "";
@@ -159,7 +158,7 @@ ws.forEach((w, i) => {
 h += `<defs>${wellClips}</defs>`;
 // ground line, ends, break at 60 m
 let zig = `M ${X0} ${B}`; for (let xx = X0, k = 0; xx < X1; xx += 24, k++) zig += ` L ${Math.min(xx + 12, X1)} ${B + (k % 2 ? -6 : 6)} L ${Math.min(xx + 24, X1)} ${B}`;
-h += `<line id="ground" x1="${X0}" x2="${X1}" y1="${G}" y2="${G}" stroke="#000" stroke-width="${SECTION.GROUND_W}"/>
+h += `<line id="ground" x1="${X0}" x2="${X1}" y1="${G}" y2="${G}" stroke="#000" stroke-width="${SECTION.GROUND_W}"/><g id="icons">${icons}</g>
       <g id="gInfo2" class="fade"><line x1="${X0 - 18}" x2="${X0}" y1="${G}" y2="${G}" stroke="#000" stroke-width="${SECTION.GROUND_W}"/>
       <text x="${X0}" y="${G - 12}" class="ax">WEST · ${W.toFixed(2)}° E</text><text x="${X1}" y="${G - 12}" class="ax" text-anchor="end">EAST · ${E.toFixed(2)}° E</text>
       <path d="${zig}" fill="none" stroke="#000" stroke-width="1.5"/>
@@ -179,6 +178,8 @@ const ease = t => t < 0 ? 0 : t > 1 ? 1 : t * t * (3 - 2 * t);
 const tween = (ms, f) => new Promise(done => { const t0 = performance.now();
   const k = now => { const t = Math.min(1, (now - t0) / ms); f(ease(t)); if (t < 1) requestAnimationFrame(k); else done(); }; requestAnimationFrame(k); });
 if (INTRO) {
+  // the well icons arrived with the flip: show them on the line straight away
+  svg.innerHTML = `<line x1="${X0}" x2="${X1}" y1="${G}" y2="${G}" stroke="#000" stroke-width="${SECTION.GROUND_W}"/>${icons}`;
   // load the textures before the build starts, so the wipe shows soil, not blanks (at most 1.5 s)
   const srcs = [...new Set(PARTS.map(L => TEX[L.tex].src))];
   await Promise.race([Promise.all(srcs.map(s => { const im = new Image(); im.src = s; return im.decode().catch(() => {}); })),
