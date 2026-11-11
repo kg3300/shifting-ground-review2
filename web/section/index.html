@@ -114,6 +114,9 @@ f += T(1699.3, 966.1, "wnum fade", `${t23.m.toFixed(1)} m`)
    + T(1605.1, 1037, "wsrc fade wrap", "Median of the belt's CGWB monitoring wells, pre-monsoon", "width:268px");
 // key text
 f += T(101.5, 999.5, "r13 g up fade", "First reading") + T(101.5, 1021.5, "r13 g up fade", "Last reading. Red = how far the water fell at that well");
+// credit and caveats, next to the key (Krishna, 11 Nov). The ISRIC photos are CC BY-SA 3.0: credit and changes must be stated.
+f += T(560, 999.5, "r13 g up fade", "Layers: CGWB aquifer mapping, simplified; kankar depth schematic.")
+   + T(560, 1021.5, "r13 g up fade", "Photos: ISRIC PE-005, BR-020, IT-011, IN-011, CC BY-SA 3.0, greyscale and mirrored; not this site's soils.");
 const frame = document.getElementById("f"); frame.innerHTML = f;
 const place = () => { const F = frameToScreen(); frame.style.transform = `translate(${F.x(0)}px, ${F.y(0)}px) scale(${F.s})`; };
 place(); addEventListener("resize", place);

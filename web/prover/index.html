@@ -252,16 +252,21 @@ rice.src = "rice.png"; maize.src = "maize.png";                 // the old Prove
 const ORDER = (() => { let s = 7; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;   // fixed order in which plots switch
   const a = [...Array(100).keys()]; for (let i = 99; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; })();
 // look of the block (first pass; Krishna to tune): plant height in cells, dot spacing in px, contrast and brightness of the cut-outs
-const AXO_SET = { plant: 1.5, spacing: 2.5, contrast: 1.8, bright: 0.85, pond: 0.86, water: "#7a7a7a" };
-{ const q = new URLSearchParams(location.search); for (const k in AXO_SET) if (q.has(k)) AXO_SET[k] = +q.get(k); }
+// T opens a tuning panel for all of these (Krishna, 11 Nov): mode "dots" = the collage's dot screen, "plain" = the block drawn
+// directly at screen resolution (no dots, no pixelation). dot = largest dot as a share of its cell, gamma = how fast dots grow
+// with darkness, cut = lightest grey that still gets a dot.
+const AXO_DEF = { mode: "dots", spacing: 2.5, dot: 0.55, gamma: 0.65, cut: 0.03, plant: 1.5, contrast: 1.8, bright: 0.85, pond: 0.86, water: "#7a7a7a" };
+const AXO_SET = { ...AXO_DEF };
+{ const q = new URLSearchParams(location.search); for (const k in AXO_SET) if (q.has(k)) AXO_SET[k] = typeof AXO_DEF[k] === "number" ? +q.get(k) : q.get(k); }
 const axo = { cv: $("axo"), scene: document.createElement("canvas"), lo: document.createElement("canvas"), count: -1 };
 function drawAxo(count) {
   const cv = axo.cv, dpr = devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
   if (!W || !H) return;
   if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
   // 1. the scene, in plain greys
-  const sc = axo.scene; sc.width = W; sc.height = H;
-  const g = sc.getContext("2d");
+  const plain = AXO_SET.mode === "plain", k = plain ? dpr : 1;   // plain: draw the scene at device resolution and show it as it is
+  const sc = axo.scene; sc.width = Math.round(W * k); sc.height = Math.round(H * k);
+  const g = sc.getContext("2d"); g.setTransform(k, 0, 0, k, 0, 0);
   g.fillStyle = "#fff"; g.fillRect(0, 0, W, H);
   const N = 10, c = Math.min(W * 0.92 / (2 * N * 0.866), H * 0.97 / (N + 2.3 + 2.2));   // cell size: fits plants + top face + soil depth
   const hx = c * 0.866, hy = c * 0.5, depth = c * 2.2, ox = W / 2, oy = c * 2.3;
@@ -287,6 +292,7 @@ function drawAxo(count) {
     g.drawImage(im, x - w / 2, y - h * 0.96, w, h);
   }
   g.filter = "none";
+  if (plain) { const x = cv.getContext("2d"); x.setTransform(1, 0, 0, 1, 0, 0); x.drawImage(sc, 0, 0, cv.width, cv.height); return; }
   // 2. the same dot screen as the collage: one dot per 3.5 px cell, size from the cell's darkness
   const sp = AXO_SET.spacing, cols = Math.round(W / sp), rows = Math.round(H / sp), lo = axo.lo;
   lo.width = cols; lo.height = rows;
@@ -294,12 +300,12 @@ function drawAxo(count) {
   lg.imageSmoothingEnabled = true; lg.imageSmoothingQuality = "high"; lg.drawImage(sc, 0, 0, cols, rows);
   const d = lg.getImageData(0, 0, cols, rows).data, x = cv.getContext("2d");
   x.setTransform(dpr, 0, 0, dpr, 0, 0); x.fillStyle = "#fff"; x.fillRect(0, 0, W, H); x.fillStyle = "#000";
-  const gx = W / cols, gy = H / rows, rmax = 0.55 * gx;
+  const gx = W / cols, gy = H / rows, rmax = AXO_SET.dot * gx;
   for (let jj = 0; jj < rows; jj++) {
     x.beginPath();
     for (let ii = 0; ii < cols; ii++) {
-      const dk = 1 - d[(jj * cols + ii) * 4] / 255; if (dk < 0.03) continue;
-      const r = rmax * Math.pow(dk, 0.65), px = (ii + 0.5) * gx, py = (jj + 0.5) * gy;
+      const dk = 1 - d[(jj * cols + ii) * 4] / 255; if (dk < AXO_SET.cut) continue;
+      const r = rmax * Math.pow(dk, AXO_SET.gamma), px = (ii + 0.5) * gx, py = (jj + 0.5) * gy;
       x.moveTo(px + r, py); x.arc(px, py, r, 0, 6.2832);
     }
     x.fill();
@@ -347,7 +353,39 @@ $("land").addEventListener("input", () => render());
 const panel = $("panel");
 const togglePanel = on => panel.classList.toggle("on", on === undefined ? !panel.classList.contains("on") : on);
 $("open").onclick = () => togglePanel(); $("close").onclick = () => togglePanel(false);
+// ---------- T: tuning panel for the soil block (Krishna, 11 Nov). Saved in this browser (localStorage "proverTune");
+// "Copy settings" puts them on the clipboard to send to Claude, who bakes them into prover_tune.json (loaded first, if present).
+const TUNE_ROWS = [["mode", "Drawing", ["dots", "plain"]], ["spacing", "Dot spacing (px)", 1, 8, 0.1], ["dot", "Dot size (share of cell)", 0.2, 1, 0.01],
+  ["gamma", "Dot growth (gamma)", 0.2, 2, 0.01], ["cut", "Lightest grey with a dot", 0, 0.3, 0.005], ["plant", "Plant height (cells)", 0.5, 3, 0.05],
+  ["contrast", "Plant contrast", 0.5, 3, 0.05], ["bright", "Plant brightness", 0.3, 1.5, 0.01], ["pond", "Paddy water square (share of plot)", 0.3, 1, 0.01],
+  ["water", "Paddy water grey", "colour"]];
+const tune = document.createElement("div"); tune.id = "tune";
+tune.style.cssText = "position:fixed;right:12px;top:12px;z-index:9;background:#fff;border:1.5px solid #000;padding:12px 14px;font:12px Inter,Helvetica,Arial,sans-serif;width:290px;display:none";
+const saveTune = () => { try { localStorage.setItem("proverTune", JSON.stringify(AXO_SET)); } catch (e) {} };
+function buildTune() {
+  tune.innerHTML = `<div style="font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px">Soil block · T to close</div>` +
+    TUNE_ROWS.map(([k, lab, a, b, st]) => {
+      const v = AXO_SET[k], ctl = Array.isArray(a) ? `<select data-k="${k}">${a.map(o => `<option${o === v ? " selected" : ""}>${o}</option>`).join("")}</select>`
+        : a === "colour" ? `<input data-k="${k}" type="color" value="${v}">`
+        : `<input data-k="${k}" type="range" min="${a}" max="${b}" step="${st}" value="${v}" style="width:100%">`;
+      return `<label style="display:block;margin:6px 0">${lab} <b data-v="${k}" style="float:right;font-variant-numeric:tabular-nums">${v}</b>${ctl}</label>`; }).join("") +
+    `<div style="display:flex;gap:6px;margin-top:10px"><button id="tCopy">Copy settings</button><button id="tReset">Reset to design</button></div>`;
+  tune.querySelectorAll("[data-k]").forEach(el => el.oninput = () => {
+    const k = el.dataset.k; AXO_SET[k] = typeof AXO_DEF[k] === "number" ? +el.value : el.value;
+    tune.querySelector(`[data-v="${k}"]`).textContent = AXO_SET[k]; saveTune(); axo.count = -1; render(); });
+  tune.querySelector("#tCopy").onclick = e => { navigator.clipboard.writeText(JSON.stringify(AXO_SET, null, 1)); e.target.textContent = "Copied"; };
+  tune.querySelector("#tReset").onclick = () => { Object.assign(AXO_SET, AXO_BASE); saveTune(); buildTune(); axo.count = -1; render(); };
+}
+let AXO_BASE = { ...AXO_SET };                                   // the design: the page's values, or prover_tune.json once baked
+document.body.append(tune);
+fetch("prover_tune.json").then(r => r.ok ? r.json() : null).catch(() => null).then(baked => {
+  if (baked) { Object.assign(AXO_SET, baked); AXO_BASE = { ...AXO_SET }; }
+  try { const own = JSON.parse(localStorage.getItem("proverTune") || "null"); if (own) Object.assign(AXO_SET, own); } catch (e) {}
+  axo.count = -1; render();
+});
 addEventListener("keydown", e => {
+  if ((e.key === "t" || e.key === "T") && !e.target.closest?.("#tune")) { const on = tune.style.display === "none"; if (on) buildTune(); tune.style.display = on ? "block" : "none"; return; }
+  if (e.target.closest?.("#tune")) return;                       // the panel's own controls keep their keys
   if (e.target === $("land")) return;
   if (part === 1) {                                     // part 1: up/down choose the block, -> or Enter starts the simulator, <- back to the collage
     if (e.target === $("sLand") && ["ArrowLeft", "ArrowRight"].includes(e.key)) return;   // the size slider takes left/right while focused
