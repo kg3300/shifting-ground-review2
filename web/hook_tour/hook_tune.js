@@ -42,8 +42,10 @@ const MASKS = [["punjab", "Punjab's outline", "punjab", ["punjab_line"]],
 const MASK_DEF = { on: false, op: 0.6, col: "#000000" };
 const signedArea = r => r.reduce((s, p, i) => { const q = r[(i + 1) % r.length]; return s + (p[0] * q[1] - q[0] * p[1]); }, 0) / 2;
 
-export function initTune({ map, steps, getStep, defaultOn, defaultHatch, defaultMask, places, defaultPlaces, scale }) {
+export function initTune({ map, steps, getStep, defaultOn, defaultHatch, defaultMask, places, defaultPlaces, scale, linked = {} }) {
   const KEY = "hookTune";
+  // linked slides (Krishna, 10 Nov: slides 5 and 6 match slide 4): a linked slide shows and edits its source slide's settings
+  const src = st => linked[st] ?? st;
   const EMPTY = () => ({ lines: {}, places: {}, hatches: {}, mask: {} });
   let saved = EMPTY();
   try { saved = Object.assign(saved, JSON.parse(localStorage.getItem(KEY) || "{}")); } catch (e) {}
@@ -123,7 +125,7 @@ export function initTune({ map, steps, getStep, defaultOn, defaultHatch, default
       }
     }).catch(e => console.warn("mask:", e));
   }
-  function apply(st = getStep()) { applyLines(st); applyHatches(st); applyPlaces(st); applyMask(st); }
+  function apply(st = getStep()) { st = src(st); applyLines(st); applyHatches(st); applyPlaces(st); applyMask(st); }
 
   // ---------- the panel ----------
   const panel = document.createElement("div");
@@ -151,8 +153,8 @@ export function initTune({ map, steps, getStep, defaultOn, defaultHatch, default
 
   const set = (bucket, key, st, patch) => { saved[bucket][key] = saved[bucket][key] || {}; saved[bucket][key][st] = { ...(saved[bucket][key][st] || {}), ...patch }; save(); };
   function build() {
-    const st = getStep();
-    let h = `<div class="slide">Slide ${st + 1}: ${steps[st].title}</div><div class="note">Settings for this slide only. T hides the panel; ← → change slide.</div>`;
+    const now = getStep(), st = src(now), group = Object.keys(steps).map(Number).filter(i => src(i) === st);
+    let h = `<div class="slide">Slide ${now + 1}: ${steps[now].title}</div><div class="note">${group.length > 1 ? `Linked: these settings apply to slides ${group.map(i => i + 1).join(", ")}.` : "Settings for this slide only."} T hides the panel; ← → change slide.</div>`;
     for (const [group, list] of TUNE_LINES) {
       h += `<h3>${group}</h3>`;
       for (const [id, name] of list) {
@@ -203,7 +205,7 @@ export function initTune({ map, steps, getStep, defaultOn, defaultHatch, default
     panel.innerHTML = h;
   }
   panel.addEventListener("input", e => {
-    const row = e.target.closest(".row"), st = getStep();
+    const row = e.target.closest(".row"), st = src(getStep());
     if (row && row.dataset.mask) {                      // the mask
       const k = e.target.dataset.k, v = k === "on" ? e.target.checked : k === "op" ? +e.target.value : e.target.value;
       set("mask", row.dataset.mask, st, { [k]: v });
@@ -234,7 +236,7 @@ export function initTune({ map, steps, getStep, defaultOn, defaultHatch, default
   });
   panel.addEventListener("change", e => { if (e.target.dataset.k === "on" || (e.target.tagName === "SELECT" && e.target.dataset.k !== "col")) build(); });
   panel.addEventListener("click", e => {
-    const st = getStep(), kAll = e.target.dataset.all, kNone = e.target.dataset.none;
+    const st = src(getStep()), kAll = e.target.dataset.all, kNone = e.target.dataset.none;
     if (kAll || kNone) { for (const p of markers.filter(p => p.kind === (kAll || kNone))) { saved.places[p.name] = saved.places[p.name] || {}; saved.places[p.name][st] = !!kAll; }
       save(); applyPlaces(st); build(); }
     if (e.target.id === "tuneCopy") navigator.clipboard.writeText(JSON.stringify(saved)).then(() => { e.target.textContent = "Copied"; }, () => { e.target.textContent = "Copy failed: see console"; console.log(JSON.stringify(saved)); });

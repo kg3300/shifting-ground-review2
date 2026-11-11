@@ -73,7 +73,7 @@
 <script type="module">
 import { addLiveGrain } from "./live_grain.js?v=ramp1";   // ?v: bump when live_grain.js changes, so browsers drop the cached copy
 import { loadFigmaStyles, applyFigmaStyles } from "./figma_styles.js";
-import { initTune } from "./hook_tune.js";
+import { initTune } from "./hook_tune.js?v=link1";
 import { flipToSection } from "./flip.js";   // last slide, -> : the outline flips into the soil section (Krishna, 10 Nov)
 let TUNE = null;   // the per-slide tuning panel (T), set up once the data is loaded
 const Q = new URLSearchParams(location.search);
@@ -411,6 +411,7 @@ map.on("load", async () => {
     defaultOn: (id, st) => { const want = new Set(MAPLAYERS.base); STEPS[st].on.forEach(k => MAPLAYERS[k].forEach(x => want.add(x))); return want.has(id); },
     defaultHatch: (id, st) => id === "belt_hatch" ? STEPS[st].on.includes("belt") : STEPS[st].frame === "f3_punjab",
     defaultMask: (id, st) => (id === "punjab" && st === 2) || (id === "area" && [3, 4, 5].includes(st)),   // Krishna, 10 Nov: outside Punjab dimmed on slide 3, outside Sangrur-Barnala on slides 4-6
+    linked: { 4: 3, 5: 3 },   // Krishna, 10 Nov: slides 5 and 6 use slide 4's lines, hatches, mask and places
     defaultPlaces: (name, st) => (STEPS[st].on.includes("belt") && cityNames.has(name)) || (STEPS[st].labels === "towns" && townNames.has(name)) });
   // baked defaults: hook_tune.json (Krishna's settings, once sent); ?tunefile=x.json loads another file and always wins (for stills)
   try { const tf = Q.get("tunefile") || "hook_tune.json", base = await fetch(tf);
