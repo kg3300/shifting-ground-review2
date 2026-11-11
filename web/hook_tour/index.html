@@ -30,16 +30,25 @@
   #count { color: var(--red); font-weight: 700; font-size: calc(15 * var(--u)); letter-spacing: .1em; text-transform: uppercase; }
   #title { margin: calc(8 * var(--u)) 0 calc(12 * var(--u)); font-size: calc(34 * var(--u)); font-weight: 800; font-style: italic;
            line-height: 1.15; text-transform: uppercase; }
-  #fact { font-size: calc(16 * var(--u)); line-height: 1.45; }
-  #src { font-size: calc(12 * var(--u)); line-height: 1.4; color: var(--ink3); margin-top: calc(10 * var(--u)); }
+  /* Krishna, 11 Nov: larger type so the panel reads at full screen (same structure) */
+  #brief { font-size: calc(21 * var(--u)); line-height: 1.45; color: var(--ink2); margin-bottom: calc(22 * var(--u)); }
+  #brief:empty, #sub:empty, #extra:empty, #chart:empty { display: none; }
+  #sub { font-size: calc(15 * var(--u)); font-weight: 700; letter-spacing: .1em; text-transform: uppercase; margin-bottom: calc(6 * var(--u)); }
+  #fact { font-size: calc(30 * var(--u)); line-height: 1.3; font-weight: 500; }
+  #extra { font-size: calc(21 * var(--u)); line-height: 1.45; color: var(--ink2); margin-top: calc(14 * var(--u)); }
+  #extra b { color: var(--ink); }
+  #src { font-size: calc(14 * var(--u)); line-height: 1.4; color: var(--ink3); margin-top: calc(14 * var(--u)); }
+  #chart { margin-top: calc(18 * var(--u)); } #chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+  #chart text { font-family: var(--font); fill: var(--ink2); } #chart .v { fill: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; }
+  #chart .h { fill: var(--ink); font-weight: 700; letter-spacing: .1em; } #chart .ax { fill: var(--ink3); }
   .verify { color: #ffcf6b; }
-  #key { margin-top: calc(22 * var(--u)); display: grid; gap: calc(12 * var(--u)); font-size: calc(12 * var(--u)); line-height: 1.4; color: var(--ink2); }
-  #key b { display: block; text-transform: uppercase; letter-spacing: .1em; font-size: calc(12 * var(--u)); color: var(--ink); font-weight: 700;
+  #key { margin-top: auto; padding-top: calc(22 * var(--u)); display: grid; gap: calc(12 * var(--u)); font-size: calc(14 * var(--u)); line-height: 1.4; color: var(--ink2); }
+  #key b { display: block; text-transform: uppercase; letter-spacing: .1em; font-size: calc(13 * var(--u)); color: var(--ink); font-weight: 700;
            margin-bottom: calc(2 * var(--u)); }
   #key .ramp { display: block; height: calc(8 * var(--u)); margin-top: calc(6 * var(--u)); }
   #key .rampl { display: flex; justify-content: space-between; font-size: calc(11 * var(--u)); color: var(--ink3); margin-top: calc(3 * var(--u));
                 font-variant-numeric: tabular-nums; } #key .rampl i { font-style: normal; }
-  #nav { margin-top: auto; display: flex; align-items: center; gap: calc(10 * var(--u)); }
+  #nav { margin-top: calc(24 * var(--u)); display: flex; align-items: center; gap: calc(10 * var(--u)); }
   #nav button { background: none; color: var(--ink); border: 1px solid var(--rule); width: calc(44 * var(--u)); height: calc(34 * var(--u));
                 font: calc(17 * var(--u)) var(--font); cursor: pointer; }
   #nav button:disabled { opacity: .3; cursor: default; }
@@ -63,6 +72,7 @@
   .lbl::before { content: ""; display: inline-block; width: calc(5 * var(--u)); height: calc(5 * var(--u)); border-radius: 50%; background: var(--ink);
                  margin-right: calc(5 * var(--u)); vertical-align: calc(1 * var(--u)); }
   .lbl.pct { font-weight: 700; text-align: center; line-height: 1.2; } .lbl.pct::before { display: none; }
+  .lbl.river { font-style: italic; font-weight: 500; font-size: calc(15 * var(--u)); color: #cfe3ee; } .lbl.river::before { display: none; }
 </style>
 </head>
 <body>
@@ -71,8 +81,12 @@
 <aside id="panel">
   <div id="count"></div>
   <h1 id="title"></h1>
+  <div id="brief"></div>
+  <div id="sub"></div>
   <div id="fact"></div>
+  <div id="extra"></div>
   <div id="src"></div>
+  <div id="chart"></div>
   <div id="key"></div>
   <div id="nav"><button id="prev" aria-label="Previous step">&larr;</button><div id="dots"></div><button id="next" aria-label="Next step">&rarr;</button></div>
 </aside>
@@ -93,9 +107,9 @@ const FW = 1920, FH = 1080, PANEL = 576;     // the frames were composed at 1920
 // Line widths follow Drought Interfaces' ranking: they grow with zoom, linearly from map zoom 5 to 24.
 const grow = (a, b) => ["interpolate", ["linear"], ["zoom"], 5, a, 24, b];
 const WATER = "#1D4C65";           // DI rivers and aqueducts
-// the overdraft ramp (Krishna, 10 Nov: a gradient by stage of extraction): light red at 100% (the limit), the template red mid-way,
-// dark red at 390% (Sunam, the highest). Placeholder stops for Krishna to set.
-const RED_RAMP = { lo: "#FFB0B0", hi: "#7A0000", from: 100, to: 390 };
+// the overdraft ramp (Krishna, 10-11 Nov: a gradient by stage of extraction): clear red at 100% (the limit), the presentation red
+// mid-way, a dirty dried-blood brown at 390% (Sunam, the highest), so the range reads as how grave it is, not as a signal.
+const RED_RAMP = { lo: "#e3242b", hi: "#4a1410", from: 100, to: 390 };   // Krishna, 11 Nov: no pink; clear red -> presentation red -> dried-blood brown
 const RED = "#c8102e";             // red = overdraft only. Krishna, 11 Nov: the presentation red, as in the section, collage and Prover
 // slide 5 (Krishna, 10 Nov): the wells in the same red ramp, by how fast the water falls (2013-22 rate x 10 = m a decade; data 1.3 to 18.9)
 const WELL_RAMP = { from: 0, to: 20 };
@@ -123,20 +137,20 @@ const src = { cgwb: "CGWB Dynamic Ground Water Assessment 2025–26, via INGRES"
 const fmt = n => Number(n).toLocaleString("en-IN");
 const month = d => new Date(d).toLocaleDateString("en-GB", { month: "short", year: "numeric" });
 const LAYERS = {
-  india:   { name: "India", read: "India by opacity: the rest of the world is dimmed.",
+  india:   { name: "India",
              hover: p => [p.name, null, "Country", src.ne] },
   belt:    { name: "The Green Revolution belt", read: "Hatched: Punjab and Haryana.",
              hover: p => ["Punjab + Haryana", "With Chandigarh", "The Green Revolution belt", src.ne] },
   area:    { name: "Sangrur–Barnala", read: "Hatched, strongest line: the study area, 11 blocks in 2 districts.",
              hover: p => ["Sangrur and Barnala", "2 districts, 11 blocks", "Study area", "CGWB block outlines (±150 m)"] },
   district:{ name: "Districts", hover: p => [p.district, null, "District", src.ne] },
-  overdraft: { name: "Overdraft", read: "Red dots: the paddy in blocks that pump more than the ground gives back each year (all 11). The deeper the red, the more a block pumps; each block's % is on the map and on hover."
+  overdraft: { name: "Overdraft", read: "Red dots: the paddy in blocks that pump more than the ground gives back each year. The darker the red, the more a block pumps."
                + `<span class="ramp" style="background:linear-gradient(90deg,${RED_RAMP.lo},${RED},${RED_RAMP.hi})"></span><span class="rampl"><i>${RED_RAMP.from}%</i><i>${(RED_RAMP.from + RED_RAMP.to) / 2}%</i><i>${RED_RAMP.to}%</i></span>`,
              hover: p => [p.block, `${p.district} district`, `Pumps <b>${p.stage_pct}%</b> of its yearly extractable groundwater (2025–26)`,
                           `${fmt(p.extraction_ham)} ha·m pumped against ${fmt(p.extractable_ham)} ha·m extractable`,
                           `First assessment on record, ${p.first_year}: ${p.first_stage_pct}%`, `Block · ${p.category}`, src.cgwb] },
   blocks:  { name: "Blocks", hover: p => [p.block, `${p.district} district`, `Stage of extraction 2025–26: ${p.stage_pct}%`, `Block · ${p.category}`, src.cgwb] },
-  wells:   { name: "Monitoring wells", read: "The 23 wells with enough readings for a trend. Each one is drawn as a small section: the bar is the ground, the line runs down to the water table ▽ at the latest reading (1 m = 1 px). The red is how fast the water is falling: metres a decade at the well's 2013–22 rate."
+  wells:   { name: "Monitoring wells", read: "Each well as a small section: the bar is the ground, the line runs down to the water table ▽ at its latest reading (1 m = 1 px). The darker the red, the faster the water falls."
                + `<span class="ramp" style="background:linear-gradient(90deg,${RED_RAMP.lo},${RED},${RED_RAMP.hi})"></span><span class="rampl"><i>${WELL_RAMP.from} m</i><i>${(WELL_RAMP.from + WELL_RAMP.to) / 2} m</i><i>${WELL_RAMP.to} m a decade</i></span>`,
              hover: p => [p.station_name, `${p.block} block`, `Water ${p.last_depth_m} m below ground (${month(p.last_date)})`,
                           p.slope_m_per_yr != null ? `Falling ${p.slope_m_per_yr} m a year, about ${Math.round(p.slope_m_per_yr * 10)} m a decade (2013–22 trend, ${p.n} readings)` : `Too few readings for a trend (${p.n})`,
@@ -149,23 +163,28 @@ const LAYERS = {
 // ============ TOUR: 6 steps (Krishna's order, 10 Nov): India -> belt -> Punjab -> Sangrur-Barnala -> wells fall -> red (end).
 // Frames 1-4 are Krishna's; 5-6 stay on frame 4's camera so the grain stays exact. Fact texts are drafts for Krishna to reword.
 const STEPS = [
-  { frame: "f1_globe_india", title: "India", on: ["india"],
+  { frame: "f1_globe_india", title: "Shifting Ground", on: ["india"], sub: "India",
+    brief: "Shifting Ground is a critical data atlas, a farm-scale water model and a speculative room that show Punjab's policymakers, from the position of one farm in the Sangrur–Barnala belt, how free power and guaranteed procurement made paddy the safest crop, test whether that farm can escape the trap, and imagine what follows when the guarantee ends.",
     fact: "Nearly half of India's workers (46.1%) work in agriculture.",
     src: `PLFS Annual Report, July 2023–June 2024 (NSO, 23 Sep 2024), as reported in the press: 46.1%, up from 45.8% the year before. <span class="verify">To verify against the report.</span> A share of workers, not of the population.` },
   { frame: "f2_belt", title: "The Green Revolution belt", on: ["belt"],
     fact: "India's breadbasket: Punjab and Haryana supplied about three of every four tonnes of the wheat the government bought in 2024–25.",
+    extra: "<b>Punjab 124 lakh tonnes, Haryana 71,</b> of 262 lakh tonnes bought across India.",
     src: `PIB, wheat procurement RMS 2024–25 as of 24 May 2024, via the press: Punjab 124.26 + Haryana 71.49 of 262.48 lakh tonnes (75%). <span class="verify">To verify at PIB; the final season total may differ.</span>` },
   { frame: "f3_punjab", title: "Punjab", on: ["area", "district"],
     fact: "Punjab: 50,362 km², about 1.5% of India's land. It gave 124.14 lakh tonnes of rice to the central pool in 2023–24, about a quarter of all the rice the government bought.",
-    src: `Area: state profiles (official figure <span class="verify">to verify</span>). Rice: PIB, KMS 2023–24 (Punjab 124.14 LMT; all India at least 489.15 LMT by 24 May 2024, so Punjab's share is at most 25%).` },
+    extra: "<b>Punjab means “five waters”:</b> the Sutlej, Beas, Ravi, Chenab and Jhelum. Since 1947 the Sutlej and Beas run through Indian Punjab and the Ravi along its border; the Chenab and Jhelum flow in Pakistan.",
+    labels: "rivers",
+    src: `Area: state profiles (official figure <span class="verify">to verify</span>). Rice: PIB, KMS 2023–24 (Punjab 124.14 LMT; all India at least 489.15 LMT by 24 May 2024, so Punjab's share is at most 25%). Rivers: Natural Earth; the name, Encyclopaedia Britannica, “Punjab” (region).` },
   { frame: "f4_blocks", title: "Sangrur and Barnala: 11 blocks", on: ["area", "district", "blocks"], labels: "blocks",
-    fact: "Paddy covers 80.9% of the ground in the 11 blocks (satellite map, 2021). Official crop statistics: 81.9%.",
-    src: "Open-SARice-10 (Zenodo 18905953), 2021; DES land-use statistics via India Data Portal. Each dot's area = share of paddy under it." },
+    fact: "Two districts, 11 blocks, about 4,300 km². Paddy covers 80.9% of the ground.",
+    extra: "Almost all of it is watered from below: <b>tubewells irrigate 72% of Sangrur's irrigated land and 52% of Barnala's</b>. The water the paddy drinks comes out of the ground under it.",
+    src: `Paddy: Open-SARice-10 (Zenodo 18905953), satellite map, 2021; official crop statistics give 81.9% (DES via India Data Portal). Area: measured from CGWB's block outlines. Irrigation: DES land-use statistics 2023–24 via India Data Portal (Sangrur 183,969 of 255,448 ha; Barnala 64,824 of 123,639 ha); <span class="verify">to verify</span>.` },
   { frame: "f4_blocks", title: "The water table falls", on: ["area", "district", "blocks", "wells"],
-    fact: "Every monitoring well with enough readings is falling (23 of 23, 2013–22). Barnala: 9.2 m below ground in 1985, 45.2 m in 2023.",
-    src: src.wells + ". These are CGWB monitoring wells, not irrigation tubewells." },
+    fact: "Every monitoring well with enough readings is falling: 23 of 23, at 1 to 19 m a decade.", chart: "wells",
+    src: src.wells + ", pre-monsoon, 2013–22 trend × 10. These are CGWB monitoring wells, not irrigation tubewells." },
   { frame: "f4_blocks", title: "Over the limit", on: ["area", "district", "overdraft"], labels: "pct",
-    fact: "All 11 blocks are over-exploited. Together they pump 268% of the groundwater the ground gives back each year.",
+    fact: "All 11 blocks are over-exploited. Together they pump 268% of the groundwater the ground gives back each year.", chart: "blocks",
     src: src.cgwb + ". Stage of extraction = yearly extraction ÷ yearly extractable resource." },
   // dropped 10 Nov (Krishna: the wells slide replaces it). Kept here to bring back if wanted:
   // { frame: "f4_blocks", title: "Canal and tubewell", on: ["area", "district", "blocks", "canals"],
@@ -303,6 +322,15 @@ function atStop() {
 }
 map.on("render", drawTicks);
 
+// the five rivers' labels: each sits on its river (Natural Earth), at the vertex nearest a point picked in slide 3's view
+const RIVERS = [["Sutlej", 75.55, 31.0], ["Beas", 75.55, 31.55], ["Ravi", 74.9, 32.05], ["Chenab", 73.7, 32.3], ["Jhelum", 73.1, 32.6]];
+function nearestOn(name, lo, la) {
+  let best = [lo, la], d = Infinity;
+  for (const f of (DATA.rivers?.features || []).filter(f => f.properties.name === name))
+    for (const L of f.geometry.type === "LineString" ? [f.geometry.coordinates] : f.geometry.coordinates)
+      for (const c of L) { const e = (c[0] - lo) ** 2 + (c[1] - la) ** 2; if (e < d) { d = e; best = c; } }
+  return best;
+}
 let labels = [];
 function setLabels(kind) {
   labels.forEach(m => m.remove()); labels = [];
@@ -310,7 +338,32 @@ function setLabels(kind) {
   const add = (txt, ll, cls) => { const e = document.createElement("div"); e.className = "lbl " + (cls || ""); e.innerHTML = txt;
     labels.push(new maplibregl.Marker({ element: e, anchor: cls === "pct" ? "center" : "left" }).setLngLat(ll).addTo(map)); };
   if (kind === "pct") DATA.blocks.features.forEach(f => add(`${f.properties.block}<br>${Math.round(f.properties.stage_pct)}%`, [f.properties.label_lon, f.properties.label_lat], "pct"));
+  if (kind === "rivers") RIVERS.forEach(([n, lo, la]) => add(n, nearestOn(n, lo, la), "river"));   // slide 3: the five rivers (Krishna, 11 Nov)
   if (kind === "blocks") DATA.blocks.features.forEach(f => add(f.properties.block, [f.properties.label_lon, f.properties.label_lat], "pct"));   // Krishna, 10 Nov: names at each block's visual centre
+}
+
+// ============ panel charts (Krishna, 11 Nov): ranked bars, each bar in its map colour ============
+// slide 5: the 23 wells, metres fallen a decade at their 2013-22 rate; slide 6: the 11 blocks' stage of extraction, line at 100%
+const wellName = n => n.replace(/\s*-\s*pz.*$/i, "").replace(/\s+0?7\s*pz.*$/i, "").replace(/\s+M$/, "").trim();
+function chartSvg(kind) {
+  const W = 516, LX = 150, VX = 456;                       // frame px: panel text width, label column, end of the bars
+  const rows = kind === "wells"
+    ? DATA.wellsM.features.map(f => f.properties).filter(p => p.slope_m_per_yr != null)
+        .map(p => ({ n: wellName(p.station_name), v: p.slope_m_per_yr * 10, c: rampColour(p.slope_m_per_yr * 10, WELL_RAMP.from, WELL_RAMP.to) }))
+    : DATA.blocks.features.map(f => f.properties).map(p => ({ n: p.block, v: p.stage_pct, c: rampColour(p.stage_pct, RED_RAMP.from, RED_RAMP.to) }));
+  rows.sort((a, b) => b.v - a.v);
+  const RH = kind === "wells" ? 17 : 26, BH = kind === "wells" ? 11 : 17, top = 26, max = kind === "wells" ? 20 : 400, bw = VX - LX;
+  const x = v => LX + v / max * bw, H = top + rows.length * RH + 22, fs = kind === "wells" ? 12 : 14;
+  let o = `<svg viewBox="0 0 ${W} ${H}"><text x="0" y="13" class="h" font-size="12">${kind === "wells" ? "METRES FALLEN A DECADE, BY WELL" : "PUMPED, % OF WHAT THE GROUND GIVES BACK"}</text>`;
+  rows.forEach((r, i) => { const y = top + i * RH;
+    o += `<text x="${LX - 8}" y="${y + BH - 1}" font-size="${fs}" text-anchor="end">${r.n}</text>`
+       + `<rect x="${LX}" y="${y}" width="${Math.max(1, x(r.v) - LX).toFixed(1)}" height="${BH}" fill="${r.c}"/>`
+       + `<text x="${W}" y="${y + BH - 1}" font-size="${fs}" class="v" text-anchor="end">${kind === "wells" ? r.v.toFixed(1) + " m" : Math.round(r.v) + "%"}</text>`; });
+  const yb = top + rows.length * RH;
+  if (kind === "blocks") o += `<line x1="${x(100)}" x2="${x(100)}" y1="${top - 4}" y2="${yb}" stroke="#fff" stroke-width="1.5" stroke-dasharray="3 3"/>`
+                            + `<text x="${x(100) + 4}" y="${yb + 15}" font-size="12" class="ax">100% = the limit</text>`;
+  else o += `<text x="${LX}" y="${yb + 15}" font-size="12" class="ax">0</text><text x="${x(10)}" y="${yb + 15}" font-size="12" class="ax" text-anchor="middle">10 m</text><text x="${x(20)}" y="${yb + 15}" font-size="12" class="ax" text-anchor="middle">20 m</text>`;
+  return o + "</svg>";
 }
 
 function render(fly) {
@@ -320,7 +373,7 @@ function render(fly) {
   // the hatch: the belt in frame 2, the study area in frame 3 (Krishna: same hatch for both); none at block scale
   map.setLayoutProperty("area_hatch_f3", "visibility", S.frame === "f3_punjab" ? "visible" : "none");
   // place names come from the tuning panel's places list (per slide); only the block names and percentages are drawn here
-  setLabels(["pct", "blocks"].includes(S.labels) ? S.labels : null);
+  setLabels(["pct", "blocks", "rivers"].includes(S.labels) ? S.labels : null);
   setRed(S.on.includes("overdraft") ? 1 : 0);
   if (TUNE) { TUNE.apply(step); TUNE.refresh(); }
   drawTicks();
@@ -329,7 +382,11 @@ function render(fly) {
   // panel
   document.getElementById("count").textContent = `Step ${step + 1} of ${STEPS.length}`;
   document.getElementById("title").textContent = S.title;
+  document.getElementById("brief").textContent = S.brief || "";
+  document.getElementById("sub").textContent = S.sub || "";
   document.getElementById("fact").textContent = S.fact;
+  document.getElementById("extra").innerHTML = S.extra || "";
+  document.getElementById("chart").innerHTML = S.chart && DATA.blocks ? chartSvg(S.chart) : "";
   document.getElementById("src").innerHTML = S.src ? "Source: " + S.src : "";
   document.getElementById("key").innerHTML = S.on.filter(k => LAYERS[k].read).map(k => `<div><b>${LAYERS[k].name}</b>${LAYERS[k].read}</div>`).join("")
     + (S.frame !== "f1_globe_india" ? `<div><b>Grain</b>One dot every 4 px; its area = the share of paddy in the ground under it (2021).</div>` : "");
@@ -400,6 +457,7 @@ map.on("load", async () => {
   const grain = dots;   // the export modes wait for grain.op === 1 (always, now)
   await Promise.all([["blocks", "blocks"], ["wellsM", "wells_monitoring"], ["places", "places"]]
     .map(async ([k, f]) => { DATA[k] = await (await fetch(D + f + ".geojson" + DV)).json(); }));   // in parallel
+  DATA.rivers = await map.getSource("rivers_ne").getData();
   // tuning panel (T): per-slide lines and places. By default slide 2 shows the 7 cities; Krishna's settings decide the rest.
   const cityNames = new Set(CITIES.map(c => c[0]));
   TUNE = initTune({ map, steps: STEPS, getStep: () => step, scale: () => s, places: DATA.places,
