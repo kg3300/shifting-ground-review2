@@ -92,7 +92,12 @@ const WATER = "#1D4C65";           // DI rivers and aqueducts
 // the overdraft ramp (Krishna, 10 Nov: a gradient by stage of extraction): light red at 100% (the limit), the template red mid-way,
 // dark red at 390% (Sunam, the highest). Placeholder stops for Krishna to set.
 const RED_RAMP = { lo: "#FFB0B0", hi: "#7A0000", from: 100, to: 390 };
-const RED = "#E00000";             // red = overdraft only. Krishna, 8 Nov: the template red (as in the A5 storyboard builds; to verify against the deck)
+const RED = "#E00000";
+// slide 5 (Krishna, 10 Nov): the wells in the same red ramp, by how fast the water falls (2013-22 rate x 10 = m a decade; data 1.3 to 18.9)
+const WELL_RAMP = { from: 0, to: 20 };
+const rampColour = (v, a, b) => { const t = Math.max(0, Math.min(1, (v - a) / (b - a))), h = x => [1, 3, 5].map(i => parseInt(x.slice(i, i + 2), 16));
+  const [p, q, u] = t < 0.5 ? [h(RED_RAMP.lo), h(RED), t * 2] : [h(RED), h(RED_RAMP.hi), t * 2 - 1];
+  return "rgb(" + p.map((c, i) => Math.round(c + (q[i] - c) * u)).join(",") + ")"; };             // red = overdraft only. Krishna, 8 Nov: the template red (as in the A5 storyboard builds; to verify against the deck)
 const GREEN = "#3f8f45";           // paddy dots. Krishna, 8 Nov: deep paddy green
 const STYLE = {
   ground: "hsl(222, 56%, 4%)",
@@ -127,7 +132,8 @@ const LAYERS = {
                           `${fmt(p.extraction_ham)} ha·m pumped against ${fmt(p.extractable_ham)} ha·m extractable`,
                           `First assessment on record, ${p.first_year}: ${p.first_stage_pct}%`, `Block · ${p.category}`, src.cgwb] },
   blocks:  { name: "Blocks", hover: p => [p.block, `${p.district} district`, `Stage of extraction 2025–26: ${p.stage_pct}%`, `Block · ${p.category}`, src.cgwb] },
-  wells:   { name: "Monitoring wells", read: "The 23 wells with enough readings for a trend. Each tick hangs from its well; its length is how far the water fell in a decade at the well's 2013–22 rate (1 m = 4 px): from 1.3 m to 18.9 m.",
+  wells:   { name: "Monitoring wells", read: "The 23 wells with enough readings for a trend. Each one is drawn as a small section: the bar is the ground, the line runs down to the water table ▽ at the latest reading (1 m = 1 px). The red is how fast the water is falling: metres a decade at the well's 2013–22 rate."
+               + `<span class="ramp" style="background:linear-gradient(90deg,${RED_RAMP.lo},${RED},${RED_RAMP.hi})"></span><span class="rampl"><i>${WELL_RAMP.from} m</i><i>${(WELL_RAMP.from + WELL_RAMP.to) / 2} m</i><i>${WELL_RAMP.to} m a decade</i></span>`,
              hover: p => [p.station_name, `${p.block} block`, `Water ${p.last_depth_m} m below ground (${month(p.last_date)})`,
                           p.slope_m_per_yr != null ? `Falling ${p.slope_m_per_yr} m a year, about ${Math.round(p.slope_m_per_yr * 10)} m a decade (2013–22 trend, ${p.n} readings)` : `Too few readings for a trend (${p.n})`,
                           "Monitoring well", src.wells] },
@@ -176,6 +182,7 @@ const MAPLAYERS = {
   area: ["state_lines", "punjab_line", "canals_main", "area_hatch_f3", "area_line", "area_hit", "rivers_ne"],
   district: ["district_line", "district_hit"], blocks: ["block_line", "block_hit", "rivers_osm"],
   overdraft: ["block_line", "overdraft_hit", "rivers_osm"],
+  retired: ["wells_long", "wells_l_hit"],   // listed so they stay hidden on every slide (no step turns them on)
   wells: ["wells_monitoring", "wells_m_hit"],   // Krishna, 10 Nov: only the 23 wells with a 2013-22 trend; the long-record ticks are off canals: ["canals", "drains", "canals_hit", "drains_hit", "rivers_osm"],
   context: ["districts_ph", "drains_ph"],   // not on any slide by default: switched on per slide in the tuning panel (T)
 };
@@ -250,7 +257,7 @@ const map = new maplibregl.Map({
       line("state_lines", "state_lines", { ...STYLE.state, width: grow(0.75, 12), opacity: 0.5 }),
       line("india_line", "india", STYLE.state), line("punjab_line", "punjab", STYLE.state), line("belt_line", "belt", STYLE.studyOutline),
       line("block_line", "blocks", STYLE.block), line("district_line", "districts", STYLE.district), line("area_line", "area", STYLE.studyOutline),
-      { id: "wells_monitoring", type: "circle", source: "wells_m", filter: ["!=", ["get", "slope_m_per_yr"], null], paint: { "circle-color": "#fff", "circle-radius": 2.5 } },
+      { id: "wells_monitoring", type: "circle", source: "wells_m", filter: ["!=", ["get", "slope_m_per_yr"], null], paint: { "circle-color": "#fff", "circle-radius": 2.5, "circle-opacity": 0 } },   // drawn as the SVG icon instead
       { id: "wells_long", type: "circle", source: "wells_l", paint: { "circle-color": "#fff", "circle-radius": 3 } },
       { id: "wells_m_hit", type: "circle", source: "wells_m", filter: ["!=", ["get", "slope_m_per_yr"], null], paint: { "circle-radius": 9, "circle-opacity": 0 } },
       { id: "wells_l_hit", type: "circle", source: "wells_l", paint: { "circle-radius": 9, "circle-opacity": 0 } },
@@ -266,16 +273,19 @@ const HOVER = [["wells_l_hit", "wellsLong"], ["wells_m_hit", "wells"], ["canals_
 
 // ============ wells as down-ticks (Krishna, 8 Nov): a tick hangs from each well; length = depth to water, 1 m = 1 px at frame scale ============
 // Drawn in an SVG over the map and redrawn every frame. Long-record wells: solid to the first reading, dashed on to the latest.
-const TICK = { pxPerM: 4, decade: 10, width: 3, longThin: 1.5, dash: "4 3", colour: "#fff", opacity: 0.9 };
+const TICK = { pxPerM: 1, bar: 9, mark: 4.5, width: 3, longThin: 1.5, dash: "4 3", colour: "#fff", opacity: 0.9 };
 const ticksSvg = document.getElementById("ticks");
 function drawTicks() {
-  // Krishna, 10 Nov: tick length = the drop, not the depth: metres fallen in a decade at the 2013-22 rate (slope x 10), same window for every well
+  // Krishna, 10 Nov: each well as a small section: ground bar, line down to the water table (latest reading), water mark; red by rate of fall
   if (!DATA.wellsM || map.getLayoutProperty("wells_monitoring", "visibility") === "none") { ticksSvg.innerHTML = ""; return; }
-  const k = TICK.pxPerM * s, r1 = v => Math.round(v * 10) / 10;
-  let out = `<g id="wells_ticks" stroke="${TICK.colour}" stroke-opacity="${TICK.opacity}" stroke-width="${r1(TICK.width * s)}" stroke-linecap="butt">`;
+  const k = TICK.pxPerM * s, r1 = v => Math.round(v * 10) / 10, b = TICK.bar * s / 2, m = TICK.mark * s;
+  let out = `<g id="wells_ticks" stroke-opacity="${TICK.opacity}" stroke-width="${r1(TICK.width * s)}" stroke-linecap="butt">`;
   for (const f of DATA.wellsM.features) { const p = f.properties; if (p.slope_m_per_yr == null) continue;
-    const q = map.project(f.geometry.coordinates), y = q.y + 2.5;
-    out += `<line x1="${r1(q.x)}" y1="${r1(y)}" x2="${r1(q.x)}" y2="${r1(y + p.slope_m_per_yr * TICK.decade * k)}"/>`; }
+    const q = map.project(f.geometry.coordinates), x = r1(q.x), y0 = r1(q.y), y1 = r1(q.y + p.last_depth_m * k);
+    const c = rampColour(p.slope_m_per_yr * 10, WELL_RAMP.from, WELL_RAMP.to);
+    out += `<g stroke="${c}" fill="${c}"><line x1="${r1(x - b)}" y1="${y0}" x2="${r1(x + b)}" y2="${y0}"/><line x1="${x}" y1="${y0}" x2="${x}" y2="${y1}"/>`
+         + `<path stroke="none" d="M${r1(x - m)} ${r1(y1 - m * 1.6)} L${r1(x + m)} ${r1(y1 - m * 1.6)} L${x} ${y1} Z"/>`
+         + `<line x1="${r1(x - b)}" y1="${y1}" x2="${r1(x + b)}" y2="${y1}" stroke-width="${r1(s)}"/></g>`; }
   ticksSvg.innerHTML = out + "</g>";
 }
 
